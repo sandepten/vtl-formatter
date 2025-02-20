@@ -1,5 +1,6 @@
+"use client";
+
 import { useState, useCallback } from "react";
-import "./App.css";
 
 interface Token {
   type: string;
@@ -16,7 +17,7 @@ function tokenize(vtl: string): Token[] {
     if (char === "#") {
       let value = "#";
       current++;
-      while (current < vtl.length && /[a-zA-Z]/.test(vtl[current])) {
+      while (current < vtl.length && /[a-zA-Z]/.test(vtl[current]!)) {
         value += vtl[current];
         current++;
       }
@@ -27,7 +28,7 @@ function tokenize(vtl: string): Token[] {
     if (char === "$") {
       let value = "$";
       current++;
-      while (current < vtl.length && /[a-zA-Z0-9._\[\]]/.test(vtl[current])) {
+      while (current < vtl.length && /[a-zA-Z0-9._\[\]]/.test(vtl[current]!)) {
         value += vtl[current];
         current++;
       }
@@ -47,7 +48,9 @@ function tokenize(vtl: string): Token[] {
       tokens.push({ type: "string", value });
       continue;
     }
-
+    if (!char) {
+      continue;
+    }
     if (/[{}\[\]:,()]/.test(char)) {
       tokens.push({ type: "punctuation", value: char });
       current++;
@@ -78,20 +81,18 @@ function App() {
       let formattedVTL = "";
       const indentStack: number[] = [0];
       let needsNewline = false;
-      // Flag indicating that we're in an inline block (for #set)
       let inlineMode = false;
-      // Flags to handle multi-token #set expressions.
       let processingSet = false;
       let setParenCount = 0;
 
       const currentIndent = () =>
-        " ".repeat(indentStack[indentStack.length - 1]);
+        " ".repeat(indentStack[indentStack.length - 1]!);
 
       for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
+        if (!token) continue;
         const directiveValue = token.value.trim();
 
-        // When processing a #set, we do not flush inline mode on string tokens.
         if (
           !processingSet &&
           inlineMode &&
@@ -102,14 +103,11 @@ function App() {
           inlineMode = false;
         }
 
-        // If not in inline mode and a newline is needed, insert it.
         if (needsNewline && !inlineMode) {
           formattedVTL += "\n" + currentIndent();
           needsNewline = false;
         }
 
-        // If a new directive (other than a continued #set) starts while in inline mode,
-        // flush inline mode.
         if (
           !processingSet &&
           token.type === "directive" &&
@@ -133,14 +131,14 @@ function App() {
               i = conditionResult.index;
               formattedVTL += "\n" + currentIndent() + "#elseif " + condition;
               indentStack.push(
-                indentStack[indentStack.length - 1] + indentSize,
+                indentStack[indentStack.length - 1]! + indentSize,
               );
               needsNewline = true;
             } else if (directiveValue.startsWith("#else")) {
               indentStack.pop();
               formattedVTL += "\n" + currentIndent() + "#else";
               indentStack.push(
-                indentStack[indentStack.length - 1] + indentSize,
+                indentStack[indentStack.length - 1]! + indentSize,
               );
               needsNewline = true;
             } else if (directiveValue.startsWith("#if")) {
@@ -149,43 +147,36 @@ function App() {
               i = conditionResult.index;
               formattedVTL += "\n" + currentIndent() + "#if " + condition;
               indentStack.push(
-                indentStack[indentStack.length - 1] + indentSize,
+                indentStack[indentStack.length - 1]! + indentSize,
               );
               needsNewline = true;
             } else if (directiveValue.startsWith("#set")) {
-              // Print the #set directive inline.
               formattedVTL +=
                 (needsNewline ? "\n" + currentIndent() : "") + token.value;
-              // Enter set processing mode.
               processingSet = true;
               inlineMode = true;
-              // Reset parenthesis count.
               setParenCount = 0;
             } else {
               formattedVTL += "\n" + currentIndent() + token.value;
               if (directiveValue.startsWith("#foreach")) {
                 indentStack.push(
-                  indentStack[indentStack.length - 1] + indentSize,
+                  indentStack[indentStack.length - 1]! + indentSize,
                 );
               }
               needsNewline = true;
             }
             break;
           case "punctuation":
-            // If processing a #set, update the parenthesis counter.
             if (processingSet) {
               if (token.value === "(") {
                 setParenCount++;
               } else if (token.value === ")") {
                 setParenCount--;
-                // When we've closed all parentheses for the #set, exit processingSet.
                 if (setParenCount === 0) {
                   processingSet = false;
-                  // End the inline block so subsequent tokens start on a new line.
                   inlineMode = false;
                 }
               }
-              // Always append punctuation inline while processing a set.
               formattedVTL += token.value;
             } else {
               formattedVTL += token.value;
@@ -195,18 +186,15 @@ function App() {
             }
             break;
           default:
-            // If not processing a set, add tokens normally.
             formattedVTL += token.value;
         }
       }
 
-      // Remove unnecessary empty lines
       formattedVTL = formattedVTL.replace(/\n\s*\n/g, "\n");
-
       setOutput(formattedVTL.trim());
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error formatting VTL:", error);
-      setOutput(`Error: ${error.message}`);
+      setOutput(`Error: ${(error as Error).message}`);
     }
   }, [input]);
 
@@ -230,6 +218,7 @@ function App() {
 
     while (index < tokens.length) {
       const token = tokens[index];
+      if (!token) break;
 
       if (token.type === "punctuation" && token.value === "(") {
         openParens++;
@@ -247,35 +236,59 @@ function App() {
   }
 
   return (
-    <div className="vtl-formatter">
-      <h1>VTL Formatter</h1>
-      <div className="formatter-container">
-        <div className="input-section">
-          <h2>Input VTL</h2>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Paste your unformatted VTL here..."
-          />
-        </div>
-        <div className="controls">
-          <button onClick={formatVTL}>Format VTL →</button>
-        </div>
-        <div className="output-section">
-          <h2>Formatted VTL</h2>
+    <div className="min-h-screen bg-gray-900 p-8 font-sans text-white">
+      <header className="mb-8 text-center">
+        <h1 className="text-5xl font-extrabold text-blue-400 drop-shadow-lg md:text-6xl">
+          VTL Formatter
+        </h1>
+      </header>
+      {/* Main area takes available height minus header/footer */}
+      <main className="flex h-[calc(100vh-250px)] flex-grow flex-col gap-8 md:flex-row">
+        <section className="flex flex-1 flex-col rounded-xl bg-gray-800 p-6 shadow-lg">
+          <h2 className="mb-4 text-2xl font-semibold text-blue-300">
+            Input VTL
+          </h2>
+          <div className="flex-1">
+            <textarea
+              className="h-full w-full resize-none rounded-md bg-gray-700 p-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Paste your unformatted VTL here..."
+            />
+          </div>
+        </section>
+        <section className="relative flex flex-1 flex-col rounded-xl bg-gray-800 p-6 shadow-lg">
+          <h2 className="mb-4 text-2xl font-semibold text-blue-300">
+            Formatted VTL
+          </h2>
           <button
-            className={`copy-button ${copied ? "copied" : ""}`}
             onClick={handleCopy}
+            className={`absolute right-6 top-6 rounded-md border px-4 py-2 text-sm transition ${
+              copied
+                ? "border-blue-500 bg-blue-500"
+                : "border-blue-600 bg-blue-600"
+            } hover:bg-blue-700`}
           >
             {copied ? "✓ Copied!" : "Copy"}
           </button>
-          <textarea
-            value={output}
-            readOnly
-            placeholder="Formatted VTL will appear here..."
-          />
-        </div>
-      </div>
+          <div className="flex-1">
+            <textarea
+              className="h-full w-full resize-none rounded-md bg-gray-700 p-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={output}
+              readOnly
+              placeholder="Formatted VTL will appear here..."
+            />
+          </div>
+        </section>
+      </main>
+      <footer className="mt-8 flex justify-center">
+        <button
+          onClick={formatVTL}
+          className="rounded-lg bg-blue-600 px-8 py-4 font-bold text-white shadow-lg transition duration-200 hover:bg-blue-700"
+        >
+          Format VTL →
+        </button>
+      </footer>
     </div>
   );
 }
