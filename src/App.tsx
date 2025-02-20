@@ -78,6 +78,8 @@ function App() {
       let formattedVTL = "";
       const indentStack: number[] = [0];
       let needsNewline = false;
+      // Flag indicating that we're in an inline block (for #set)
+      let inlineMode = false;
 
       const currentIndent = () =>
         " ".repeat(indentStack[indentStack.length - 1]);
@@ -86,9 +88,32 @@ function App() {
         const token = tokens[i];
         const directiveValue = token.value.trim();
 
-        if (needsNewline) {
+        // If inline mode is active and we encounter a JSON key token (string starting with a quote),
+        // flush inline mode: break the line and use the same indent as the current line.
+        if (
+          inlineMode &&
+          token.type === "string" &&
+          token.value.startsWith('"')
+        ) {
+          formattedVTL += "\n" + currentIndent();
+          inlineMode = false;
+        }
+
+        // If we're not in inline mode and a newline is needed, insert it.
+        if (needsNewline && !inlineMode) {
           formattedVTL += "\n" + currentIndent();
           needsNewline = false;
+        }
+
+        // If a new directive (other than a continued #set) starts while in inline mode,
+        // flush inline mode.
+        if (
+          token.type === "directive" &&
+          !directiveValue.startsWith("#set") &&
+          inlineMode
+        ) {
+          formattedVTL += "\n" + currentIndent();
+          inlineMode = false;
         }
 
         switch (token.type) {
@@ -98,9 +123,7 @@ function App() {
               formattedVTL += "\n" + currentIndent() + token.value;
               needsNewline = true;
             } else if (directiveValue.startsWith("#elseif")) {
-              // Pop indent from previous block so that #elseif aligns with #if
               indentStack.pop();
-              // Extract condition after the #elseif token
               const conditionResult = extractCondition(tokens, i + 1);
               const condition = conditionResult.condition;
               i = conditionResult.index;
@@ -125,6 +148,13 @@ function App() {
                 indentStack[indentStack.length - 1] + indentSize,
               );
               needsNewline = true;
+            } else if (directiveValue.startsWith("#set")) {
+              // Print the #set directive inline.
+              formattedVTL +=
+                (needsNewline ? "\n" + currentIndent() : "") + token.value;
+              // Enable inline mode so that following tokens (if any) will trigger a flush
+              // and be printed on new lines with the same indent.
+              inlineMode = true;
             } else {
               formattedVTL += "\n" + currentIndent() + token.value;
               if (directiveValue.startsWith("#foreach")) {
@@ -136,21 +166,9 @@ function App() {
             }
             break;
           case "punctuation":
-            if (token.value === "{") {
-              formattedVTL += "\n" + currentIndent() + "{";
-              indentStack.push(
-                indentStack[indentStack.length - 1] + indentSize,
-              );
+            formattedVTL += token.value;
+            if (token.value === ",") {
               needsNewline = true;
-            } else if (token.value === "}") {
-              indentStack.pop();
-              formattedVTL += "\n" + currentIndent() + "}";
-              needsNewline = true;
-            } else if (token.value === ",") {
-              formattedVTL += ",";
-              needsNewline = true;
-            } else {
-              formattedVTL += token.value;
             }
             break;
           default:
