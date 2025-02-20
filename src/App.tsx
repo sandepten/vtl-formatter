@@ -97,17 +97,29 @@ function App() {
               indentStack.pop();
               formattedVTL += "\n" + currentIndent() + token.value;
               needsNewline = true;
-            } else if (
-              directiveValue.startsWith("#elseif") ||
-              directiveValue.startsWith("#else")
-            ) {
-              formattedVTL += "\n" + currentIndent() + token.value;
-              needsNewline = true; // Ensure newline after
+            } else if (directiveValue.startsWith("#elseif")) {
+              // Pop indent from previous block so that #elseif aligns with #if
+              indentStack.pop();
+              // Extract condition after the #elseif token
+              const conditionResult = extractCondition(tokens, i + 1);
+              const condition = conditionResult.condition;
+              i = conditionResult.index;
+              formattedVTL += "\n" + currentIndent() + "#elseif " + condition;
+              indentStack.push(
+                indentStack[indentStack.length - 1] + indentSize,
+              );
+              needsNewline = true;
+            } else if (directiveValue.startsWith("#else")) {
+              indentStack.pop();
+              formattedVTL += "\n" + currentIndent() + "#else";
+              indentStack.push(
+                indentStack[indentStack.length - 1] + indentSize,
+              );
+              needsNewline = true;
             } else if (directiveValue.startsWith("#if")) {
               const conditionResult = extractCondition(tokens, i + 1);
               const condition = conditionResult.condition;
               i = conditionResult.index;
-
               formattedVTL += "\n" + currentIndent() + "#if " + condition;
               indentStack.push(
                 indentStack[indentStack.length - 1] + indentSize,
@@ -145,6 +157,9 @@ function App() {
             formattedVTL += token.value;
         }
       }
+
+      // Remove unnecessary empty lines
+      formattedVTL = formattedVTL.replace(/\n\s*\n/g, "\n");
 
       setOutput(formattedVTL.trim());
     } catch (error) {
