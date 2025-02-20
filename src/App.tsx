@@ -1,156 +1,211 @@
-import { useState } from 'react'
-import './App.css'
+import { useState, useCallback } from "react";
+import "./App.css";
 
-function App() {
-  const [input, setInput] = useState('')
-  const [output, setOutput] = useState('')
-  const [copied, setCopied] = useState(false)
+interface Token {
+  type: string;
+  value: string;
+}
 
-  const formatVTL = () => {
-    const formatted = input.trim();
-    const lines = formatted.split(/\n/);
-    let indentLevel = 0;
-    let inObject = false;
+function tokenize(vtl: string): Token[] {
+  const tokens: Token[] = [];
+  let current = 0;
 
-    const processComplexLine = (line: string, currentIndent: number): string => {
-      // Split by JSON properties and VTL directives while preserving the delimiters
-      const parts = line.split(/(?=(#(?:if|else|elseif|end|set)|"[^"]+"\s*:))/g).filter(Boolean);
-      let result = '';
-      let localIndent = currentIndent;
+  while (current < vtl.length) {
+    const char = vtl[current];
 
-      for (const part of parts) {
-        const trimmed = part.trim();
-        if (!trimmed) continue;
-
-        // Handle VTL directives
-        if (trimmed.startsWith('#')) {
-          if (trimmed.startsWith('#if') || trimmed.startsWith('#foreach')) {
-            result += '\n' + '  '.repeat(localIndent) + trimmed;
-            localIndent++;
-          } else if (trimmed.startsWith('#else') || trimmed.startsWith('#elseif')) {
-            localIndent--;
-            result += '\n' + '  '.repeat(localIndent) + trimmed;
-            localIndent++;
-          } else if (trimmed.startsWith('#end')) {
-            localIndent--;
-            result += '\n' + '  '.repeat(localIndent) + trimmed;
-          } else if (trimmed.startsWith('#set')) {
-            result += '\n' + '  '.repeat(localIndent) + trimmed;
-          }
-          continue;
-        }
-
-        // Handle JSON properties
-        if (trimmed.match(/"[^"]+"\s*:/)) {
-          result += '\n' + '  '.repeat(localIndent) + trimmed;
-          // If there's content after the property, process it
-          const afterColon = trimmed.split(/:\s*/)[1];
-          if (afterColon) {
-            result += ' ' + afterColon;
-          }
-        } else {
-          // Handle values or other content
-          result += ' ' + trimmed;
-        }
+    if (char === "#") {
+      let value = "#";
+      current++;
+      while (current < vtl.length && /[a-zA-Z]/.test(vtl[current])) {
+        value += vtl[current];
+        current++;
       }
+      tokens.push({ type: "directive", value });
+      continue;
+    }
 
-      return result;
-    };
-
-    const formattedLines = lines.map(line => {
-      const originalLine = line.trim();
-      if (!originalLine) return '';
-
-      // Handle array start/end
-      if (originalLine.startsWith('[')) {
-        return '[';
+    if (char === "$") {
+      let value = "$";
+      current++;
+      while (current < vtl.length && /[a-zA-Z0-9._\[\]]/.test(vtl[current])) {
+        value += vtl[current];
+        current++;
       }
-      if (originalLine.endsWith(']')) {
-        return '  '.repeat(Math.max(0, indentLevel)) + ']';
+      tokens.push({ type: "variable", value });
+      continue;
+    }
+
+    if (char === '"') {
+      let value = '"';
+      current++;
+      while (current < vtl.length && vtl[current] !== '"') {
+        value += vtl[current];
+        current++;
       }
+      value += '"';
+      current++;
+      tokens.push({ type: "string", value });
+      continue;
+    }
 
-      // Handle VTL directives at the start of lines
-      if (originalLine.startsWith('#')) {
-        if (originalLine.startsWith('#set')) {
-          return '  '.repeat(Math.max(0, indentLevel)) + originalLine;
-        }
+    if (/[{}\[\]:,()]/.test(char)) {
+      tokens.push({ type: "punctuation", value: char });
+      current++;
+      continue;
+    }
 
-        if (originalLine.match(/^#foreach|^#if/)) {
-          const indent = '  '.repeat(Math.max(0, indentLevel));
-          indentLevel++;
-          return indent + originalLine;
-        }
+    if (/\s/.test(char)) {
+      current++;
+      continue; // Skip whitespace for now
+    }
 
-        if (originalLine.match(/^#else|^#elseif/)) {
-          return '  '.repeat(Math.max(0, indentLevel - 1)) + originalLine;
-        }
-
-        if (originalLine.match(/^#end/)) {
-          indentLevel = Math.max(0, indentLevel - 1);
-          return '  '.repeat(Math.max(0, indentLevel)) + originalLine;
-        }
-      }
-
-      // Handle comma-only lines
-      if (originalLine === ',') {
-        return '  '.repeat(Math.max(0, indentLevel)) + ',';
-      }
-
-      // Handle object start
-      if (originalLine === '{') {
-        inObject = true;
-        const prefix = '  '.repeat(Math.max(0, indentLevel));
-        indentLevel++;
-        return prefix + '{';
-      }
-
-      // Handle complex mixed content
-      if (originalLine.includes('{') || (inObject && originalLine.includes(':'))) {
-        if (originalLine.startsWith('{')) {
-          inObject = true;
-          indentLevel++;
-        }
-
-        // Process the complex line
-        const processed = processComplexLine(originalLine, indentLevel);
-        return processed.trim();
-      }
-
-      // Handle closing brace
-      if (originalLine.endsWith('}')) {
-        inObject = false;
-        indentLevel = Math.max(0, indentLevel - 1);
-        return '  '.repeat(Math.max(0, indentLevel)) + '}';
-      }
-
-      return '  '.repeat(Math.max(0, indentLevel)) + originalLine;
-    });
-
-    // Join lines and clean up
-    const result = formattedLines
-      .join('\n')
-      .replace(/\n{3,}/g, '\n\n')  // Reduce multiple blank lines
-      .replace(/{\s+}/g, '{}')  // Clean up empty objects
-      .replace(/\s+,/g, ',')   // Clean up spaces before commas
-      .replace(/,(\s*\n\s*),/g, ',') // Clean up multiple commas
-      .replace(/\n\s*\n/g, '\n')  // Remove empty lines
-      .split('\n')
-      .filter(line => line.trim())  // Remove empty lines
-      .map(line => line.trimEnd())  // Remove trailing spaces
-      .join('\n');
-
-    setOutput(result);
+    // Handle other characters or throw an error
+    tokens.push({ type: "unknown", value: char });
+    current++;
   }
 
-  const handleCopy = async () => {
+  return tokens;
+}
+
+function App() {
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const formatVTL = useCallback(() => {
+    try {
+      const tokens = tokenize(input);
+      const indentSize = 2;
+      let formattedVTL = "";
+      let inJsonObject = false;
+      const indentStack: number[] = [0]; // Stack to track indentation levels
+
+      const currentIndent = () =>
+        " ".repeat(indentStack[indentStack.length - 1]);
+      const nextIndent = () =>
+        " ".repeat(indentStack[indentStack.length - 1] + indentSize);
+
+      let needsNewline = false; // Flag to track if a newline is needed
+
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        const directiveValue = token.value.trim();
+
+        if (needsNewline) {
+          formattedVTL += "\n" + currentIndent();
+          needsNewline = false;
+        }
+
+        switch (token.type) {
+          case "directive":
+            if (directiveValue === "#end") {
+              indentStack.pop();
+              formattedVTL += "\n" + currentIndent() + token.value;
+              needsNewline = false;
+            } else if (
+              directiveValue.startsWith("#elseif") ||
+              directiveValue.startsWith("#else")
+            ) {
+              formattedVTL += "\n" + currentIndent() + token.value;
+              needsNewline = false;
+            } else if (directiveValue.startsWith("#if")) {
+              // Format #if condition on a single line
+              const conditionResult = extractCondition(tokens, i + 1);
+              const condition = conditionResult.condition;
+              i = conditionResult.index;
+
+              formattedVTL +=
+                "\n" + currentIndent() + "#if (" + condition + ")";
+              indentStack.push(
+                indentStack[indentStack.length - 1] + indentSize,
+              );
+              needsNewline = true;
+            } else {
+              formattedVTL += "\n" + currentIndent() + token.value;
+              if (directiveValue.startsWith("#foreach")) {
+                indentStack.push(
+                  indentStack[indentStack.length - 1] + indentSize,
+                );
+              }
+              needsNewline = false;
+            }
+            break;
+          case "punctuation":
+            if (token.value === "{") {
+              inJsonObject = true;
+              indentStack.push(
+                indentStack[indentStack.length - 1] + indentSize,
+              );
+              formattedVTL += token.value;
+              needsNewline = true;
+            } else if (token.value === "}") {
+              indentStack.pop();
+              formattedVTL += token.value;
+              needsNewline = true;
+            } else if (token.value === ",") {
+              formattedVTL += token.value;
+              needsNewline = true;
+            } else {
+              formattedVTL += token.value;
+            }
+            break;
+          case "string":
+            formattedVTL += token.value;
+            break;
+          case "variable":
+            formattedVTL += token.value;
+            break;
+          default:
+            formattedVTL += token.value;
+        }
+      }
+
+      setOutput(formattedVTL.trim());
+    } catch (error) {
+      console.error("Error formatting VTL:", error);
+      setOutput(`Error: ${error.message}`);
+    }
+  }, [input]);
+
+  const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(output);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy text:', err);
+      console.error("Failed to copy text:", err);
     }
-  };
+  }, [output]);
+
+  // Helper function to extract the condition from an #if block
+  function extractCondition(
+    tokens: Token[],
+    startIndex: number,
+  ): { condition: string; index: number } {
+    let condition = "";
+    let index = startIndex;
+    let openParens = 0;
+
+    while (index < tokens.length) {
+      const token = tokens[index];
+
+      if (token.type === "punctuation" && token.value === "(") {
+        openParens++;
+      } else if (token.type === "punctuation" && token.value === ")") {
+        openParens--;
+        if (openParens < 0) {
+          break; // Condition ends when closing parenthesis is found
+        }
+      } else if (token.type === "directive") {
+        break; // Condition ends when another directive is found
+      }
+
+      condition += token.value;
+      index++;
+    }
+
+    return { condition: condition.trim(), index: index - 1 };
+  }
 
   return (
     <div className="vtl-formatter">
@@ -170,10 +225,10 @@ function App() {
         <div className="output-section">
           <h2>Formatted VTL</h2>
           <button
-            className={`copy-button ${copied ? 'copied' : ''}`}
+            className={`copy-button ${copied ? "copied" : ""}`}
             onClick={handleCopy}
           >
-            {copied ? '✓ Copied!' : 'Copy'}
+            {copied ? "✓ Copied!" : "Copy"}
           </button>
           <textarea
             value={output}
@@ -183,7 +238,7 @@ function App() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
