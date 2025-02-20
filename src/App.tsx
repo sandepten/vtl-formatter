@@ -80,6 +80,9 @@ function App() {
       let needsNewline = false;
       // Flag indicating that we're in an inline block (for #set)
       let inlineMode = false;
+      // Flags to handle multi-token #set expressions.
+      let processingSet = false;
+      let setParenCount = 0;
 
       const currentIndent = () =>
         " ".repeat(indentStack[indentStack.length - 1]);
@@ -88,9 +91,9 @@ function App() {
         const token = tokens[i];
         const directiveValue = token.value.trim();
 
-        // If inline mode is active and we encounter a JSON key token (string starting with a quote),
-        // flush inline mode: break the line and use the same indent as the current line.
+        // When processing a #set, we do not flush inline mode on string tokens.
         if (
+          !processingSet &&
           inlineMode &&
           token.type === "string" &&
           token.value.startsWith('"')
@@ -99,7 +102,7 @@ function App() {
           inlineMode = false;
         }
 
-        // If we're not in inline mode and a newline is needed, insert it.
+        // If not in inline mode and a newline is needed, insert it.
         if (needsNewline && !inlineMode) {
           formattedVTL += "\n" + currentIndent();
           needsNewline = false;
@@ -108,6 +111,7 @@ function App() {
         // If a new directive (other than a continued #set) starts while in inline mode,
         // flush inline mode.
         if (
+          !processingSet &&
           token.type === "directive" &&
           !directiveValue.startsWith("#set") &&
           inlineMode
@@ -152,9 +156,11 @@ function App() {
               // Print the #set directive inline.
               formattedVTL +=
                 (needsNewline ? "\n" + currentIndent() : "") + token.value;
-              // Enable inline mode so that following tokens (if any) will trigger a flush
-              // and be printed on new lines with the same indent.
+              // Enter set processing mode.
+              processingSet = true;
               inlineMode = true;
+              // Reset parenthesis count.
+              setParenCount = 0;
             } else {
               formattedVTL += "\n" + currentIndent() + token.value;
               if (directiveValue.startsWith("#foreach")) {
@@ -166,12 +172,30 @@ function App() {
             }
             break;
           case "punctuation":
-            formattedVTL += token.value;
-            if (token.value === ",") {
-              needsNewline = true;
+            // If processing a #set, update the parenthesis counter.
+            if (processingSet) {
+              if (token.value === "(") {
+                setParenCount++;
+              } else if (token.value === ")") {
+                setParenCount--;
+                // When we've closed all parentheses for the #set, exit processingSet.
+                if (setParenCount === 0) {
+                  processingSet = false;
+                  // End the inline block so subsequent tokens start on a new line.
+                  inlineMode = false;
+                }
+              }
+              // Always append punctuation inline while processing a set.
+              formattedVTL += token.value;
+            } else {
+              formattedVTL += token.value;
+              if (token.value === ",") {
+                needsNewline = true;
+              }
             }
             break;
           default:
+            // If not processing a set, add tokens normally.
             formattedVTL += token.value;
         }
       }
