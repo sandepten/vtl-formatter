@@ -56,10 +56,9 @@ function tokenize(vtl: string): Token[] {
 
     if (/\s/.test(char)) {
       current++;
-      continue; // Skip whitespace for now
+      continue; // Skip whitespace
     }
 
-    // Handle other characters or throw an error
     tokens.push({ type: "unknown", value: char });
     current++;
   }
@@ -77,15 +76,11 @@ function App() {
       const tokens = tokenize(input);
       const indentSize = 2;
       let formattedVTL = "";
-      let inJsonObject = false;
-      const indentStack: number[] = [0]; // Stack to track indentation levels
+      const indentStack: number[] = [0];
+      let needsNewline = false;
 
       const currentIndent = () =>
         " ".repeat(indentStack[indentStack.length - 1]);
-      const nextIndent = () =>
-        " ".repeat(indentStack[indentStack.length - 1] + indentSize);
-
-      let needsNewline = false; // Flag to track if a newline is needed
 
       for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
@@ -101,21 +96,19 @@ function App() {
             if (directiveValue === "#end") {
               indentStack.pop();
               formattedVTL += "\n" + currentIndent() + token.value;
-              needsNewline = false;
+              needsNewline = true;
             } else if (
               directiveValue.startsWith("#elseif") ||
               directiveValue.startsWith("#else")
             ) {
               formattedVTL += "\n" + currentIndent() + token.value;
-              needsNewline = false;
+              needsNewline = true; // Ensure newline after
             } else if (directiveValue.startsWith("#if")) {
-              // Format #if condition on a single line
               const conditionResult = extractCondition(tokens, i + 1);
               const condition = conditionResult.condition;
               i = conditionResult.index;
 
-              formattedVTL +=
-                "\n" + currentIndent() + "#if (" + condition + ")";
+              formattedVTL += "\n" + currentIndent() + "#if " + condition;
               indentStack.push(
                 indentStack[indentStack.length - 1] + indentSize,
               );
@@ -127,33 +120,26 @@ function App() {
                   indentStack[indentStack.length - 1] + indentSize,
                 );
               }
-              needsNewline = false;
+              needsNewline = true;
             }
             break;
           case "punctuation":
             if (token.value === "{") {
-              inJsonObject = true;
+              formattedVTL += "\n" + currentIndent() + "{";
               indentStack.push(
                 indentStack[indentStack.length - 1] + indentSize,
               );
-              formattedVTL += token.value;
               needsNewline = true;
             } else if (token.value === "}") {
               indentStack.pop();
-              formattedVTL += token.value;
+              formattedVTL += "\n" + currentIndent() + "}";
               needsNewline = true;
             } else if (token.value === ",") {
-              formattedVTL += token.value;
+              formattedVTL += ",";
               needsNewline = true;
             } else {
               formattedVTL += token.value;
             }
-            break;
-          case "string":
-            formattedVTL += token.value;
-            break;
-          case "variable":
-            formattedVTL += token.value;
             break;
           default:
             formattedVTL += token.value;
@@ -177,7 +163,6 @@ function App() {
     }
   }, [output]);
 
-  // Helper function to extract the condition from an #if block
   function extractCondition(
     tokens: Token[],
     startIndex: number,
@@ -193,15 +178,12 @@ function App() {
         openParens++;
       } else if (token.type === "punctuation" && token.value === ")") {
         openParens--;
-        if (openParens < 0) {
-          break; // Condition ends when closing parenthesis is found
-        }
-      } else if (token.type === "directive") {
-        break; // Condition ends when another directive is found
       }
 
       condition += token.value;
       index++;
+
+      if (openParens === 0) break;
     }
 
     return { condition: condition.trim(), index: index - 1 };
