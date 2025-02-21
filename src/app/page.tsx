@@ -14,6 +14,18 @@ function tokenize(vtl: string): Token[] {
   while (current < vtl.length) {
     const char = vtl[current];
 
+    // Handle comments that start with "##"
+    if (char === "#" && vtl[current + 1] === "#") {
+      let value = "##";
+      current += 2;
+      while (current < vtl.length && vtl[current] !== "\n") {
+        value += vtl[current];
+        current++;
+      }
+      tokens.push({ type: "comment", value });
+      continue;
+    }
+
     if (char === "#") {
       let value = "#";
       current++;
@@ -59,8 +71,9 @@ function tokenize(vtl: string): Token[] {
     }
 
     if (/\s/.test(char)) {
+      // Skip whitespace (newlines will be reinserted by the formatter)
       current++;
-      continue; // Skip whitespace
+      continue;
     }
 
     tokens.push({ type: "unknown", value: char });
@@ -70,13 +83,11 @@ function tokenize(vtl: string): Token[] {
   return tokens;
 }
 
-// Helper function to adjust spacing around "in" only if it already has whitespace.
+// Helper function to adjust spacing around "in" if needed.
 function adjustForEachCondition(condition: string): string {
   if (condition.startsWith("(") && condition.endsWith(")")) {
     let inner = condition.slice(1, -1).trim();
-    // Insert a space before and after "in" if it’s immediately adjacent to a variable name.
     inner = inner.replace(/(\$\w+)(in)(\$\w+)/g, "$1 in $3");
-    // Normalize spacing in case there are extra spaces
     inner = inner.replace(/\s+in\s+/g, " in ");
     return `(${inner})`;
   }
@@ -98,8 +109,9 @@ function App() {
       let inlineMode = false;
       let processingSet = false;
       let setParenCount = 0;
+      let lastTokenWasComment = false; // new flag for comment handling
 
-      // Flags for handling macro header formatting.
+      // For handling inline macro headers.
       let inMacroHeader = false;
       let macroParenCount = 0;
 
@@ -109,6 +121,11 @@ function App() {
       for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
         if (!token) continue;
+
+        // Reset flag if token is not a comment.
+        if (token.type !== "comment") {
+          lastTokenWasComment = false;
+        }
 
         // If we're in the middle of a macro header, output tokens inline.
         if (inMacroHeader) {
@@ -131,8 +148,8 @@ function App() {
           formattedVTL += token.value;
           if (
             tokens[i + 1] &&
-            tokens[i + 1]!.type === "punctuation" &&
-            tokens[i + 1]!.value === "("
+            tokens[i + 1].type === "punctuation" &&
+            tokens[i + 1].value === "("
           ) {
             inMacroHeader = true;
             macroParenCount = 0;
@@ -210,7 +227,7 @@ function App() {
               );
               needsNewline = true;
             } else if (directiveValue.startsWith("#set")) {
-              // Always start each #set on a new line if it's not the very first token.
+              // Always start a new #set on its own line unless it’s the very first token.
               if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
                 formattedVTL += "\n" + currentIndent();
               }
@@ -230,7 +247,7 @@ function App() {
             break;
           case "punctuation":
             if (token.value === "{") {
-              // Start of a JSON (or block) - force a new line and increase indent.
+              // Start a JSON block – ensure it's on a new line and increase indent.
               if (!formattedVTL.endsWith("\n")) {
                 formattedVTL += "\n" + currentIndent();
               } else {
@@ -242,7 +259,7 @@ function App() {
               );
               needsNewline = true;
             } else if (token.value === "}") {
-              // End of a JSON block - reduce indent.
+              // End of a JSON block – decrease indent.
               indentStack.pop();
               formattedVTL += "\n" + currentIndent() + token.value;
               needsNewline = true;
@@ -265,6 +282,19 @@ function App() {
             } else {
               formattedVTL += token.value;
             }
+            break;
+          case "comment":
+            // If the previous token was a comment, force a newline before the next comment.
+            if (lastTokenWasComment) {
+              formattedVTL += "\n" + currentIndent() + token.value;
+            } else {
+              if (formattedVTL && !formattedVTL.endsWith("\n")) {
+                formattedVTL += " " + token.value;
+              } else {
+                formattedVTL += token.value;
+              }
+            }
+            lastTokenWasComment = true;
             break;
           default:
             formattedVTL += token.value;
