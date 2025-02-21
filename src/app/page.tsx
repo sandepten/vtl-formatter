@@ -83,11 +83,16 @@ function tokenize(vtl: string): Token[] {
   return tokens;
 }
 
-// Helper function to adjust spacing around "in" if needed.
+// Updated helper: if the condition is wrapped in parentheses,
+// insert a space between a variable and "in" when they are concatenated.
+// This regex now matches both "$linein$..." and "$linein${...}"
 function adjustForEachCondition(condition: string): string {
   if (condition.startsWith("(") && condition.endsWith(")")) {
     let inner = condition.slice(1, -1).trim();
-    inner = inner.replace(/(\$\w+)(in)(\$\w+)/g, "$1 in $3");
+    inner = inner.replace(
+      /(\$[a-zA-Z0-9._\[\]]+)(in)(\$[a-zA-Z0-9._\[\]]+|\$\{[^}]+\})/g,
+      "$1 in $3",
+    );
     inner = inner.replace(/\s+in\s+/g, " in ");
     return `(${inner})`;
   }
@@ -109,7 +114,7 @@ function App() {
       let inlineMode = false;
       let processingSet = false;
       let setParenCount = 0;
-      let lastTokenWasComment = false; // new flag for comment handling
+      let lastTokenWasComment = false; // For handling consecutive comments
 
       // For handling inline macro headers.
       let inMacroHeader = false;
@@ -122,12 +127,12 @@ function App() {
         const token = tokens[i];
         if (!token) continue;
 
-        // Reset flag if token is not a comment.
+        // Reset comment flag if token is not a comment.
         if (token.type !== "comment") {
           lastTokenWasComment = false;
         }
 
-        // If we're in the middle of a macro header, output tokens inline.
+        // If in a macro header, output tokens inline.
         if (inMacroHeader) {
           formattedVTL += token.value;
           if (token.type === "punctuation") {
@@ -148,8 +153,8 @@ function App() {
           formattedVTL += token.value;
           if (
             tokens[i + 1] &&
-            tokens[i + 1].type === "punctuation" &&
-            tokens[i + 1].value === "("
+            tokens[i + 1]!.type === "punctuation" &&
+            tokens[i + 1]!.value === "("
           ) {
             inMacroHeader = true;
             macroParenCount = 0;
@@ -247,7 +252,7 @@ function App() {
             break;
           case "punctuation":
             if (token.value === "{") {
-              // Start a JSON block – ensure it's on a new line and increase indent.
+              // Start a JSON block – force a new line and increase indent.
               if (!formattedVTL.endsWith("\n")) {
                 formattedVTL += "\n" + currentIndent();
               } else {
@@ -259,7 +264,7 @@ function App() {
               );
               needsNewline = true;
             } else if (token.value === "}") {
-              // End of a JSON block – decrease indent.
+              // End of a JSON block – reduce indent.
               indentStack.pop();
               formattedVTL += "\n" + currentIndent() + token.value;
               needsNewline = true;
@@ -284,7 +289,7 @@ function App() {
             }
             break;
           case "comment":
-            // If the previous token was a comment, force a newline before the next comment.
+            // If previous token was a comment, force a newline before this one.
             if (lastTokenWasComment) {
               formattedVTL += "\n" + currentIndent() + token.value;
             } else {
