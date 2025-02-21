@@ -131,8 +131,8 @@ function App() {
           formattedVTL += token.value;
           if (
             tokens[i + 1] &&
-            tokens[i + 1].type === "punctuation" &&
-            tokens[i + 1].value === "("
+            tokens[i + 1]!.type === "punctuation" &&
+            tokens[i + 1]!.value === "("
           ) {
             inMacroHeader = true;
             macroParenCount = 0;
