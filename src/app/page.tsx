@@ -48,6 +48,7 @@ function tokenize(vtl: string): Token[] {
       tokens.push({ type: "string", value });
       continue;
     }
+
     if (!char) {
       continue;
     }
@@ -98,7 +99,7 @@ function App() {
       let processingSet = false;
       let setParenCount = 0;
 
-      // New flags for macro header formatting
+      // Flags for handling macro header formatting.
       let inMacroHeader = false;
       let macroParenCount = 0;
 
@@ -109,7 +110,7 @@ function App() {
         const token = tokens[i];
         if (!token) continue;
 
-        // If we're in the middle of a macro header, simply append the token value inline.
+        // If we're in the middle of a macro header, output tokens inline.
         if (inMacroHeader) {
           formattedVTL += token.value;
           if (token.type === "punctuation") {
@@ -209,8 +210,11 @@ function App() {
               );
               needsNewline = true;
             } else if (directiveValue.startsWith("#set")) {
-              formattedVTL +=
-                (needsNewline ? "\n" + currentIndent() : "") + token.value;
+              // Always start each #set on a new line if it's not the very first token.
+              if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
+                formattedVTL += "\n" + currentIndent();
+              }
+              formattedVTL += token.value;
               processingSet = true;
               inlineMode = true;
               setParenCount = 0;
@@ -225,22 +229,41 @@ function App() {
             }
             break;
           case "punctuation":
-            if (processingSet) {
-              if (token.value === "(") {
-                setParenCount++;
-              } else if (token.value === ")") {
-                setParenCount--;
-                if (setParenCount === 0) {
-                  processingSet = false;
-                  inlineMode = false;
+            if (token.value === "{") {
+              // Start of a JSON (or block) - force a new line and increase indent.
+              if (!formattedVTL.endsWith("\n")) {
+                formattedVTL += "\n" + currentIndent();
+              } else {
+                formattedVTL += currentIndent();
+              }
+              formattedVTL += token.value;
+              indentStack.push(
+                indentStack[indentStack.length - 1]! + indentSize,
+              );
+              needsNewline = true;
+            } else if (token.value === "}") {
+              // End of a JSON block - reduce indent.
+              indentStack.pop();
+              formattedVTL += "\n" + currentIndent() + token.value;
+              needsNewline = true;
+            } else if (token.value === "(" || token.value === ")") {
+              if (processingSet) {
+                if (token.value === "(") {
+                  setParenCount++;
+                } else if (token.value === ")") {
+                  setParenCount--;
+                  if (setParenCount === 0) {
+                    processingSet = false;
+                    inlineMode = false;
+                  }
                 }
               }
               formattedVTL += token.value;
+            } else if (token.value === ",") {
+              formattedVTL += token.value;
+              needsNewline = true;
             } else {
               formattedVTL += token.value;
-              if (token.value === ",") {
-                needsNewline = true;
-              }
             }
             break;
           default:
