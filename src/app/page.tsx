@@ -10,7 +10,6 @@ interface Token {
 function tokenize(vtl: string): Token[] {
   const tokens: Token[] = [];
   let current = 0;
-
   while (current < vtl.length) {
     const char = vtl[current];
 
@@ -79,13 +78,16 @@ function tokenize(vtl: string): Token[] {
     tokens.push({ type: "unknown", value: char });
     current++;
   }
-
   return tokens;
 }
 
-// Updated helper: if the condition is wrapped in parentheses,
-// insert a space between a variable and "in" when they are concatenated.
-// This regex now matches both "$linein$..." and "$linein${...}"
+// Helper to insert a space around && and || if missing.
+function normalizeLogicalOperators(condition: string): string {
+  return condition.replace(/\s*(&&|\|\|)\s*/g, " $1 ");
+}
+
+// Updated helper for foreach conditions: in addition to handling the "in" issue,
+// also normalize logical operators.
 function adjustForEachCondition(condition: string): string {
   if (condition.startsWith("(") && condition.endsWith(")")) {
     let inner = condition.slice(1, -1).trim();
@@ -94,6 +96,7 @@ function adjustForEachCondition(condition: string): string {
       "$1 in $3",
     );
     inner = inner.replace(/\s+in\s+/g, " in ");
+    inner = normalizeLogicalOperators(inner);
     return `(${inner})`;
   }
   return condition;
@@ -114,7 +117,7 @@ function App() {
       let inlineMode = false;
       let processingSet = false;
       let setParenCount = 0;
-      let lastTokenWasComment = false; // For handling consecutive comments
+      let lastTokenWasComment = false; // for comment handling
 
       // For handling inline macro headers.
       let inMacroHeader = false;
@@ -148,13 +151,13 @@ function App() {
           continue;
         }
 
-        // Special handling: if we see a #macro directive, output its header inline.
+        // Special: if we see a #macro directive, output its header inline.
         if (token.type === "directive" && token.value === "#macro") {
           formattedVTL += token.value;
           if (
             tokens[i + 1] &&
-            tokens[i + 1]!.type === "punctuation" &&
-            tokens[i + 1]!.value === "("
+            tokens[i + 1].type === "punctuation" &&
+            tokens[i + 1].value === "("
           ) {
             inMacroHeader = true;
             macroParenCount = 0;
@@ -198,7 +201,8 @@ function App() {
             } else if (directiveValue.startsWith("#elseif")) {
               indentStack.pop();
               const conditionResult = extractCondition(tokens, i + 1);
-              const condition = conditionResult.condition;
+              let condition = conditionResult.condition;
+              condition = normalizeLogicalOperators(condition);
               i = conditionResult.index;
               formattedVTL += "\n" + currentIndent() + "#elseif " + condition;
               indentStack.push(
@@ -214,7 +218,8 @@ function App() {
               needsNewline = true;
             } else if (directiveValue.startsWith("#if")) {
               const conditionResult = extractCondition(tokens, i + 1);
-              const condition = conditionResult.condition;
+              let condition = conditionResult.condition;
+              condition = normalizeLogicalOperators(condition);
               i = conditionResult.index;
               formattedVTL += "\n" + currentIndent() + "#if " + condition;
               indentStack.push(
@@ -224,8 +229,8 @@ function App() {
             } else if (directiveValue.startsWith("#foreach")) {
               const conditionResult = extractCondition(tokens, i + 1);
               let condition = conditionResult.condition;
-              i = conditionResult.index;
               condition = adjustForEachCondition(condition);
+              i = conditionResult.index;
               formattedVTL += "\n" + currentIndent() + "#foreach " + condition;
               indentStack.push(
                 indentStack[indentStack.length - 1]! + indentSize,
@@ -289,7 +294,7 @@ function App() {
             }
             break;
           case "comment":
-            // If previous token was a comment, force a newline before this one.
+            // If the previous token was a comment, force a newline before this one.
             if (lastTokenWasComment) {
               formattedVTL += "\n" + currentIndent() + token.value;
             } else {
@@ -305,7 +310,6 @@ function App() {
             formattedVTL += token.value;
         }
       }
-
       formattedVTL = formattedVTL.replace(/\n\s*\n/g, "\n");
       setOutput(formattedVTL.trim());
     } catch (error: unknown) {
@@ -331,23 +335,18 @@ function App() {
     let condition = "";
     let index = startIndex;
     let openParens = 0;
-
     while (index < tokens.length) {
       const token = tokens[index];
       if (!token) break;
-
       if (token.type === "punctuation" && token.value === "(") {
         openParens++;
       } else if (token.type === "punctuation" && token.value === ")") {
         openParens--;
       }
-
       condition += token.value;
       index++;
-
       if (openParens === 0) break;
     }
-
     return { condition: condition.trim(), index: index - 1 };
   }
 
