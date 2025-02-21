@@ -86,8 +86,8 @@ function normalizeLogicalOperators(condition: string): string {
   return condition.replace(/\s*(&&|\|\|)\s*/g, " $1 ");
 }
 
-// Updated helper for foreach conditions: in addition to handling the "in" issue,
-// also normalize logical operators.
+// Updated helper for foreach conditions: also normalize "in" spacing
+// and logical operators.
 function adjustForEachCondition(condition: string): string {
   if (condition.startsWith("(") && condition.endsWith(")")) {
     let inner = condition.slice(1, -1).trim();
@@ -117,7 +117,7 @@ function App() {
       let inlineMode = false;
       let processingSet = false;
       let setParenCount = 0;
-      let lastTokenWasComment = false; // for comment handling
+      let lastTokenWasComment = false; // For handling consecutive comments
 
       // For handling inline macro headers.
       let inMacroHeader = false;
@@ -151,13 +151,13 @@ function App() {
           continue;
         }
 
-        // Special: if we see a #macro directive, output its header inline.
+        // Special handling: if we see a #macro directive, output its header inline.
         if (token.type === "directive" && token.value === "#macro") {
           formattedVTL += token.value;
           if (
             tokens[i + 1] &&
-            tokens[i + 1].type === "punctuation" &&
-            tokens[i + 1].value === "("
+            tokens[i + 1]!.type === "punctuation" &&
+            tokens[i + 1]!.value === "("
           ) {
             inMacroHeader = true;
             macroParenCount = 0;
@@ -277,15 +277,22 @@ function App() {
               if (processingSet) {
                 if (token.value === "(") {
                   setParenCount++;
+                  formattedVTL += token.value;
                 } else if (token.value === ")") {
                   setParenCount--;
+                  // Append the closing parenthesis.
+                  formattedVTL += token.value;
                   if (setParenCount === 0) {
                     processingSet = false;
                     inlineMode = false;
+                    // Force a newline after finishing the #set directive.
+                    formattedVTL += "\n" + currentIndent();
                   }
+                  continue; // Skip further processing for this token.
                 }
+              } else {
+                formattedVTL += token.value;
               }
-              formattedVTL += token.value;
             } else if (token.value === ",") {
               formattedVTL += token.value;
               needsNewline = true;
