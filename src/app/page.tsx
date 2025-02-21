@@ -74,7 +74,6 @@ function adjustForEachCondition(condition: string): string {
   if (condition.startsWith("(") && condition.endsWith(")")) {
     let inner = condition.slice(1, -1).trim();
     // Insert a space before and after "in" if it’s immediately adjacent to a variable name.
-    // This regex looks for a pattern like "$variablein$other" and replaces it with "$variable in $other"
     inner = inner.replace(/(\$\w+)(in)(\$\w+)/g, "$1 in $3");
     // Normalize spacing in case there are extra spaces
     inner = inner.replace(/\s+in\s+/g, " in ");
@@ -99,12 +98,47 @@ function App() {
       let processingSet = false;
       let setParenCount = 0;
 
+      // New flags for macro header formatting
+      let inMacroHeader = false;
+      let macroParenCount = 0;
+
       const currentIndent = () =>
         " ".repeat(indentStack[indentStack.length - 1]!);
 
       for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
         if (!token) continue;
+
+        // If we're in the middle of a macro header, simply append the token value inline.
+        if (inMacroHeader) {
+          formattedVTL += token.value;
+          if (token.type === "punctuation") {
+            if (token.value === "(") {
+              macroParenCount++;
+            } else if (token.value === ")") {
+              macroParenCount--;
+              if (macroParenCount === 0) {
+                inMacroHeader = false;
+              }
+            }
+          }
+          continue;
+        }
+
+        // Special handling: if we see a #macro directive, output its header inline.
+        if (token.type === "directive" && token.value === "#macro") {
+          formattedVTL += token.value;
+          if (
+            tokens[i + 1] &&
+            tokens[i + 1].type === "punctuation" &&
+            tokens[i + 1].value === "("
+          ) {
+            inMacroHeader = true;
+            macroParenCount = 0;
+          }
+          continue;
+        }
+
         const directiveValue = token.value.trim();
 
         if (
@@ -165,11 +199,9 @@ function App() {
               );
               needsNewline = true;
             } else if (directiveValue.startsWith("#foreach")) {
-              // Extract the condition for #foreach.
               const conditionResult = extractCondition(tokens, i + 1);
               let condition = conditionResult.condition;
               i = conditionResult.index;
-              // Adjust spacing around "in" only if already present.
               condition = adjustForEachCondition(condition);
               formattedVTL += "\n" + currentIndent() + "#foreach " + condition;
               indentStack.push(
