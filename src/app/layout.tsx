@@ -6,10 +6,28 @@ import { GeistMono } from "geist/font/mono";
 import { type Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "VTL Formatter - Format Velocity Template Language",
+  title: "VTL Formatter - Velocity Template Language Formatter",
   description:
-    "A beautiful formatter for Velocity Template Language (VTL) code with syntax highlighting and clean formatting",
+    "A beautiful formatter for Velocity Template Language (VTL) code with clean formatting and automatic indentation.",
+  metadataBase: new URL("https://vtl-formatter.vercel.app"),
   icons: [{ rel: "icon", url: "/favicon.ico" }],
+  openGraph: {
+    title: "VTL Formatter",
+    description: "Format your Velocity Template Language code with ease",
+    url: "https://vtl-formatter.vercel.app",
+    siteName: "VTL Formatter",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    title: "VTL Formatter",
+    description:
+      "A beautiful formatter for Velocity Template Language (VTL) code",
+    card: "summary_large_image",
+  },
+  alternates: {
+    canonical: "https://vtl-formatter.vercel.app",
+  },
 };
 
 export default function RootLayout({
