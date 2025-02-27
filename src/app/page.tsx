@@ -1,106 +1,14 @@
 "use client";
 
 import { useState, useCallback } from "react";
-
-interface Token {
-  type: string;
-  value: string;
-}
-
-function tokenize(vtl: string): Token[] {
-  const tokens: Token[] = [];
-  let current = 0;
-  while (current < vtl.length) {
-    const char = vtl[current];
-
-    // Handle comments that start with "##"
-    if (char === "#" && vtl[current + 1] === "#") {
-      let value = "##";
-      current += 2;
-      while (current < vtl.length && vtl[current] !== "\n") {
-        value += vtl[current];
-        current++;
-      }
-      tokens.push({ type: "comment", value });
-      continue;
-    }
-
-    if (char === "#") {
-      let value = "#";
-      current++;
-      while (current < vtl.length && /[a-zA-Z]/.test(vtl[current]!)) {
-        value += vtl[current];
-        current++;
-      }
-      tokens.push({ type: "directive", value });
-      continue;
-    }
-
-    if (char === "$") {
-      let value = "$";
-      current++;
-      while (current < vtl.length && /[a-zA-Z0-9._\[\]]/.test(vtl[current]!)) {
-        value += vtl[current];
-        current++;
-      }
-      tokens.push({ type: "variable", value });
-      continue;
-    }
-
-    if (char === '"') {
-      let value = '"';
-      current++;
-      while (current < vtl.length && vtl[current] !== '"') {
-        value += vtl[current];
-        current++;
-      }
-      value += '"';
-      current++;
-      tokens.push({ type: "string", value });
-      continue;
-    }
-
-    if (!char) {
-      continue;
-    }
-    if (/[{}\[\]:,()]/.test(char)) {
-      tokens.push({ type: "punctuation", value: char });
-      current++;
-      continue;
-    }
-
-    if (/\s/.test(char)) {
-      // Skip whitespace (newlines will be reinserted by the formatter)
-      current++;
-      continue;
-    }
-
-    tokens.push({ type: "unknown", value: char });
-    current++;
-  }
-  return tokens;
-}
-
-// Helper to insert a space around && and || if missing.
-function normalizeLogicalOperators(condition: string): string {
-  return condition.replace(/\s*(&&|\|\|)\s*/g, " $1 ");
-}
-
-// Updated helper for foreach conditions: also normalize "in" spacing
-// and logical operators.
-function adjustForEachCondition(condition: string): string {
-  if (condition.startsWith("(") && condition.endsWith(")")) {
-    let inner = condition.slice(1, -1).trim();
-    inner = inner.replace(
-      /(\$[a-zA-Z0-9._\[\]]+)(in)(\$[a-zA-Z0-9._\[\]]+|\$\{[^}]+\})/g,
-      "$1 in $3",
-    );
-    inner = inner.replace(/\s+in\s+/g, " in ");
-    inner = normalizeLogicalOperators(inner);
-    return `(${inner})`;
-  }
-  return condition;
-}
+import {
+  adjustForEachCondition,
+  extractCondition,
+  normalizeLogicalOperators,
+  tokenize,
+} from "@/lib/vtl";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 function App() {
   const [input, setInput] = useState("");
@@ -335,28 +243,6 @@ function App() {
     }
   }, [output]);
 
-  function extractCondition(
-    tokens: Token[],
-    startIndex: number,
-  ): { condition: string; index: number } {
-    let condition = "";
-    let index = startIndex;
-    let openParens = 0;
-    while (index < tokens.length) {
-      const token = tokens[index];
-      if (!token) break;
-      if (token.type === "punctuation" && token.value === "(") {
-        openParens++;
-      } else if (token.type === "punctuation" && token.value === ")") {
-        openParens--;
-      }
-      condition += token.value;
-      index++;
-      if (openParens === 0) break;
-    }
-    return { condition: condition.trim(), index: index - 1 };
-  }
-
   return (
     <div className="min-h-screen bg-gray-900 p-8 font-sans text-white">
       <header className="mb-8 text-center">
@@ -370,8 +256,8 @@ function App() {
             Input VTL
           </h2>
           <div className="flex-1">
-            <textarea
-              className="h-full w-full resize-none rounded-md bg-gray-700 p-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <Textarea
+              className="h-full w-full resize-none bg-gray-700 font-mono"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Paste your unformatted VTL here..."
@@ -382,19 +268,19 @@ function App() {
           <h2 className="mb-4 text-2xl font-semibold text-blue-300">
             Formatted VTL
           </h2>
-          <button
+          <Button
             onClick={handleCopy}
-            className={`absolute right-6 top-6 rounded-md border px-4 py-2 text-sm transition ${
+            className={`absolute right-6 top-6 text-sm transition ${
               copied
                 ? "border-blue-500 bg-blue-500"
                 : "border-blue-600 bg-blue-600"
             } hover:bg-blue-700`}
           >
             {copied ? "✓ Copied!" : "Copy"}
-          </button>
+          </Button>
           <div className="flex-1">
-            <textarea
-              className="h-full w-full resize-none rounded-md bg-gray-700 p-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <Textarea
+              className="h-full w-full resize-none bg-gray-700 font-mono"
               value={output}
               readOnly
               placeholder="Formatted VTL will appear here..."
@@ -403,12 +289,13 @@ function App() {
         </section>
       </main>
       <footer className="mt-8 flex justify-center">
-        <button
+        <Button
           onClick={formatVTL}
-          className="rounded-lg bg-blue-600 px-8 py-4 font-bold text-white shadow-lg transition duration-200 hover:bg-blue-700"
+          className="bg-blue-600 font-bold text-white shadow-lg transition duration-200 hover:bg-blue-700"
+          size="lg"
         >
           Format VTL →
-        </button>
+        </Button>
       </footer>
     </div>
   );
