@@ -9,7 +9,6 @@ import {
 } from "@/lib/vtl";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Copy } from "lucide-react";
 
 function App() {
@@ -254,7 +253,7 @@ function App() {
   }, [output]);
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 font-sans text-white">
+    <div className="fixed inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 font-sans text-white">
       {/* Decorative elements */}
       <div className="pointer-events-none absolute left-0 top-0 z-0 h-full w-full overflow-hidden">
         <div className="absolute -left-40 -top-40 h-80 w-80 rounded-full bg-blue-500 opacity-10 blur-3xl"></div>
@@ -272,28 +271,60 @@ function App() {
           </p>
         </header>
 
-        {/* New layout structure with centered button */}
-        <div className="flex flex-1 flex-col items-center justify-center">
-          <main className="mx-auto grid w-full max-w-screen-2xl flex-1 gap-4 md:grid-cols-2 md:gap-6">
+        <div className="flex flex-1 flex-col">
+          <main className="relative mx-auto flex w-full max-w-screen-2xl flex-1 flex-col gap-4 md:flex-row md:gap-6">
             {/* Input Section */}
-            <section className="flex h-full flex-col rounded-xl border border-white/5 bg-gray-900/50 p-4 shadow-xl backdrop-blur-md transition-all duration-200 md:p-6">
+            <section className="flex h-full flex-1 flex-col rounded-xl border border-white/5 bg-gray-900/50 p-4 shadow-xl backdrop-blur-md transition-all duration-200 md:p-6">
               <h2 className="mb-2 text-lg font-semibold text-blue-300 md:mb-3">
                 Input VTL
               </h2>
               <div className="flex-1 overflow-hidden rounded-md border border-gray-800">
-                <ScrollArea className="h-full w-full">
-                  <Textarea
-                    className="h-[72vh] w-full border-0 bg-gray-800/50 font-mono focus-visible:ring-1 focus-visible:ring-blue-500"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Paste your unformatted VTL here..."
-                  />
-                </ScrollArea>
+                <Textarea
+                  className="h-full w-full border-0 bg-gray-800/50 font-mono focus-visible:ring-1 focus-visible:ring-blue-500"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Paste your unformatted VTL here..."
+                />
               </div>
             </section>
 
+            {/* Format Button - Fixed width to prevent layout shift */}
+            <div className="flex items-center justify-center md:px-2">
+              <Button
+                onClick={formatVTL}
+                className="min-w-[110px] bg-blue-600 px-3 py-2 font-medium text-white shadow-lg transition duration-300 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-700/20 disabled:pointer-events-none disabled:opacity-70 md:h-12 md:min-w-[110px]"
+                disabled={!input.trim() || isFormatting}
+              >
+                {isFormatting ? (
+                  <span className="mx-auto flex items-center whitespace-nowrap">
+                    <span className="animate-pulse">Format</span>
+                    <span className="ml-1 inline-flex animate-bounce">...</span>
+                  </span>
+                ) : (
+                  <span className="mx-auto flex items-center whitespace-nowrap">
+                    <span>Format</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="ml-1"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                  </span>
+                )}
+              </Button>
+            </div>
+
             {/* Output Section */}
-            <section className="relative flex h-full flex-col rounded-xl border border-white/5 bg-gray-900/50 p-4 shadow-xl backdrop-blur-md transition-all duration-200 md:p-6">
+            <section className="relative flex h-full flex-1 flex-col rounded-xl border border-white/5 bg-gray-900/50 p-4 shadow-xl backdrop-blur-md transition-all duration-200 md:p-6">
               <div className="mb-2 flex items-center justify-between md:mb-3">
                 <h2 className="text-lg font-semibold text-blue-300">
                   Formatted VTL
@@ -314,36 +345,15 @@ function App() {
               </div>
 
               <div className="flex-1 overflow-hidden rounded-md border border-gray-800">
-                <ScrollArea className="h-full w-full">
-                  <Textarea
-                    className="h-[72vh] w-full border-0 bg-gray-800/50 font-mono focus-visible:ring-1 focus-visible:ring-blue-500"
-                    value={output}
-                    readOnly
-                    placeholder="Formatted VTL will appear here..."
-                  />
-                </ScrollArea>
+                <Textarea
+                  className="h-full w-full border-0 bg-gray-800/50 font-mono focus-visible:ring-1 focus-visible:ring-blue-500"
+                  value={output}
+                  readOnly
+                  placeholder="Formatted VTL will appear here..."
+                />
               </div>
             </section>
           </main>
-
-          {/* Centered Format Button */}
-          <div className="mt-6 flex justify-center">
-            <Button
-              onClick={formatVTL}
-              className="bg-blue-600 px-8 py-2 font-medium text-white shadow-lg transition duration-300 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-700/20 disabled:pointer-events-none disabled:opacity-70"
-              size="lg"
-              disabled={!input.trim() || isFormatting}
-            >
-              {isFormatting ? (
-                <>
-                  <span className="animate-pulse">Formatting</span>
-                  <span className="ml-1 inline-flex animate-bounce">...</span>
-                </>
-              ) : (
-                <>Format VTL</>
-              )}
-            </Button>
-          </div>
         </div>
       </div>
     </div>
