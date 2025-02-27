@@ -35,6 +35,12 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <head>
+        <meta
+          name="google-site-verification"
+          content="I6XhB62PxEyuECZisefa07gEQPu6UkCV2YbheJkyoS8"
+        />
+      </head>
       <body className="antialiased">
         {children}
         <Analytics />
