@@ -354,6 +354,21 @@ function App() {
               </div>
             </section>
           </main>
+
+          {/* Attribution Footer */}
+          <footer className="mt-4 text-center">
+            <p className="text-xs text-white/40">
+              Made with Love -{" "}
+              <a
+                href="https://github.com/sandepten"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-white/60 hover:underline"
+              >
+                Sandeep Kumar
+              </a>
+            </p>
+          </footer>
         </div>
       </div>
     </div>
