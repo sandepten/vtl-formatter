@@ -264,10 +264,10 @@ function App() {
       <div className="relative z-10 flex h-full flex-col p-4 sm:p-6">
         <header className="mb-4 text-center">
           <h1 className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-4xl font-extrabold text-transparent drop-shadow-lg md:text-5xl lg:text-6xl">
-            VTL Formatter
+            Apache Velocity Formatter
           </h1>
           <p className="mt-2 text-base text-blue-300/80 md:text-lg">
-            Format your Velocity Template Language code with ease
+            Format your Apache Velocity Template Language (VTL) code with ease
           </p>
         </header>
 
