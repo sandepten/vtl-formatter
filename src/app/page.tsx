@@ -272,7 +272,7 @@ function App() {
         </header>
 
         <div className="flex flex-1 flex-col">
-          <main className="relative mx-auto flex w-full max-w-screen-2xl flex-1 flex-col gap-4 md:flex-row md:gap-6">
+          <main className="relative mx-auto flex w-full flex-1 flex-col gap-4 md:flex-row md:gap-6">
             {/* Input Section */}
             <section className="flex h-full flex-1 flex-col rounded-xl border border-white/5 bg-gray-900/50 p-4 shadow-xl backdrop-blur-md transition-all duration-200 md:p-6">
               <h2 className="mb-2 text-lg font-semibold text-blue-300 md:mb-3">
