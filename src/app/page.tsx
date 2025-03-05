@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import {
   adjustForEachCondition,
   extractCondition,
+  isComplexVariableReference,
   normalizeLogicalOperators,
   tokenize,
 } from "@/lib/vtl";
@@ -34,6 +35,10 @@ function App() {
         let lastTokenWasComment = false; // For handling consecutive comments
         let lastTokenWasVariable = false; // Track if the last token was a variable
 
+        // Track when we're in a JSON key-value pair with a variable value
+        let inJsonValueVar = false;
+        let jsonVarBraceCount = 0;
+
         // For handling inline macro headers.
         let inMacroHeader = false;
         let macroParenCount = 0;
@@ -48,6 +53,57 @@ function App() {
           // Reset comment flag if token is not a comment.
           if (token.type !== "comment") {
             lastTokenWasComment = false;
+          }
+
+          // Check if we're starting a JSON key-value pair with a variable value
+          if (
+            token.type === "punctuation" &&
+            token.value === ":" &&
+            i + 1 < tokens.length &&
+            (tokens[i + 1]?.type === "variable" ||
+              isComplexVariableReference(tokens, i + 1))
+          ) {
+            formattedVTL += token.value;
+            inJsonValueVar = true;
+            continue;
+          }
+
+          // Handle variables in JSON values (both simple $var and complex ${var} formats)
+          if (inJsonValueVar && token.type === "variable") {
+            formattedVTL += token.value;
+            // If this is the start of a complex variable reference with separate $ and {
+            if (
+              token.value === "$" &&
+              i + 1 < tokens.length &&
+              tokens[i + 1]?.type === "punctuation" &&
+              tokens[i + 1]?.value === "{"
+            ) {
+              // Don't set lastTokenWasVariable or modify inJsonValueVar yet - wait for the opening brace
+              continue;
+            }
+            // If this is a complete variable reference or a simple $var
+            if (token.value.includes("{") && token.value.includes("}")) {
+              inJsonValueVar = false;
+            } else if (!token.value.includes("{")) {
+              inJsonValueVar = false;
+            }
+            lastTokenWasVariable = true;
+            continue;
+          }
+
+          // Handle braces as part of a complex variable reference
+          if (inJsonValueVar && token.type === "punctuation") {
+            formattedVTL += token.value;
+
+            if (token.value === "{") {
+              jsonVarBraceCount++;
+            } else if (token.value === "}") {
+              jsonVarBraceCount--;
+              if (jsonVarBraceCount <= 0) {
+                inJsonValueVar = false;
+              }
+            }
+            continue;
           }
 
           // Check if we need to insert a newline after a variable when followed by a JSON key
@@ -66,6 +122,7 @@ function App() {
           // NEW: Avoid inserting a newline for inline tokens that are just a quote
           if (
             !processingSet &&
+            !inJsonValueVar &&
             inlineMode &&
             token.type === "string" &&
             (token.value.startsWith('"') || token.value.startsWith("'"))
@@ -73,8 +130,8 @@ function App() {
             if (
               !(
                 token.value.length === 3 &&
-                token.value[0] === token.value[2] &&
-                (token.value[1] === '"' || token.value[1] === "'")
+                ((token.value.startsWith('"') && token.value.endsWith('"')) ||
+                  (token.value.startsWith("'") && token.value.endsWith("'")))
               )
             ) {
               formattedVTL += "\n" + currentIndent();
@@ -116,6 +173,7 @@ function App() {
 
           if (
             !processingSet &&
+            !inJsonValueVar &&
             inlineMode &&
             token.type === "string" &&
             token.value.startsWith('"')
@@ -124,13 +182,14 @@ function App() {
             inlineMode = false;
           }
 
-          if (needsNewline && !inlineMode) {
+          if (needsNewline && !inlineMode && !inJsonValueVar) {
             formattedVTL += "\n" + currentIndent();
             needsNewline = false;
           }
 
           if (
             !processingSet &&
+            !inJsonValueVar &&
             token.type === "directive" &&
             !directiveValue.startsWith("#set") &&
             inlineMode
@@ -204,7 +263,7 @@ function App() {
               }
               break;
             case "punctuation":
-              if (token.value === "{") {
+              if (token.value === "{" && !inJsonValueVar) {
                 // Start a JSON block – force a new line and increase indent.
                 if (!formattedVTL.endsWith("\n")) {
                   formattedVTL += "\n" + currentIndent();
@@ -216,7 +275,7 @@ function App() {
                   indentStack[indentStack.length - 1]! + indentSize,
                 );
                 needsNewline = true;
-              } else if (token.value === "}") {
+              } else if (token.value === "}" && !inJsonValueVar) {
                 // End of a JSON block – reduce indent.
                 indentStack.pop();
                 formattedVTL += "\n" + currentIndent() + token.value;
@@ -241,7 +300,7 @@ function App() {
                 } else {
                   formattedVTL += token.value;
                 }
-              } else if (token.value === ",") {
+              } else if (token.value === "," && !inJsonValueVar) {
                 formattedVTL += token.value;
                 needsNewline = true;
               } else {

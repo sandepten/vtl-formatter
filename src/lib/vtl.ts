@@ -29,9 +29,29 @@ export function tokenize(vtl: string): Token[] {
       continue;
     }
 
+    // Handle variable references starting with $ (both simple and complex)
     if (char === "$") {
       let value = "$";
       current++;
+
+      // Handle ${...} syntax for complex variable references
+      if (current < vtl.length && vtl[current] === "{") {
+        value += "{";
+        current++;
+        let braceCount = 1;
+
+        while (current < vtl.length && braceCount > 0) {
+          if (vtl[current] === "{") braceCount++;
+          if (vtl[current] === "}") braceCount--;
+          value += vtl[current];
+          current++;
+        }
+
+        tokens.push({ type: "variable", value });
+        continue;
+      }
+
+      // Handle simple $variable syntax
       while (current < vtl.length && /[a-zA-Z0-9._\[\]]/.test(vtl[current]!)) {
         value += vtl[current];
         current++;
@@ -87,6 +107,36 @@ export function tokenize(vtl: string): Token[] {
     current++;
   }
   return tokens;
+}
+
+// Helper function to check if tokens represent a complex variable reference
+export function isComplexVariableReference(
+  tokens: Token[],
+  startIndex: number,
+): boolean {
+  // Check if we have a $ followed immediately by { or a $ followed by whitespace and then {
+  if (startIndex >= tokens.length) return false;
+
+  // Direct ${...} pattern
+  if (
+    tokens[startIndex]!.type === "variable" &&
+    tokens[startIndex]!.value.startsWith("${")
+  ) {
+    return true;
+  }
+
+  // Split $ { pattern (separated by whitespace in the original)
+  if (
+    tokens[startIndex]!.type === "variable" &&
+    tokens[startIndex]!.value === "$" &&
+    startIndex + 1 < tokens.length &&
+    tokens[startIndex + 1]!.type === "punctuation" &&
+    tokens[startIndex + 1]!.value === "{"
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 // Helper to insert a space around && and || if missing.
