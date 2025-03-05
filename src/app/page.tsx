@@ -32,6 +32,7 @@ function App() {
         let processingSet = false;
         let setParenCount = 0;
         let lastTokenWasComment = false; // For handling consecutive comments
+        let lastTokenWasVariable = false; // Track if the last token was a variable
 
         // For handling inline macro headers.
         let inMacroHeader = false;
@@ -47,6 +48,19 @@ function App() {
           // Reset comment flag if token is not a comment.
           if (token.type !== "comment") {
             lastTokenWasComment = false;
+          }
+
+          // Check if we need to insert a newline after a variable when followed by a JSON key
+          if (
+            lastTokenWasVariable &&
+            token.type === "string" &&
+            token.value.startsWith('"') &&
+            i + 2 < tokens.length &&
+            tokens[i + 1]?.type === "punctuation" &&
+            tokens[i + 1]?.value === ":"
+          ) {
+            formattedVTL += "\n" + currentIndent();
+            lastTokenWasVariable = false;
           }
 
           // If in a macro header, output tokens inline.
@@ -228,8 +242,13 @@ function App() {
               }
               lastTokenWasComment = true;
               break;
+            case "variable":
+              formattedVTL += token.value;
+              lastTokenWasVariable = true;
+              break;
             default:
               formattedVTL += token.value;
+              lastTokenWasVariable = token.type === "variable";
           }
         }
         formattedVTL = formattedVTL.replace(/\n\s*\n/g, "\n");
