@@ -40,6 +40,7 @@ export function tokenize(vtl: string): Token[] {
       continue;
     }
 
+    // Handle double-quoted strings
     if (char === '"') {
       let value = '"';
       current++;
@@ -48,6 +49,20 @@ export function tokenize(vtl: string): Token[] {
         current++;
       }
       value += '"';
+      current++;
+      tokens.push({ type: "string", value });
+      continue;
+    }
+
+    // Handle single-quoted strings
+    if (char === "'") {
+      let value = "'";
+      current++;
+      while (current < vtl.length && vtl[current] !== "'") {
+        value += vtl[current];
+        current++;
+      }
+      value += "'";
       current++;
       tokens.push({ type: "string", value });
       continue;

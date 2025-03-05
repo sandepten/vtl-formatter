@@ -63,6 +63,25 @@ function App() {
             lastTokenWasVariable = false;
           }
 
+          // NEW: Avoid inserting a newline for inline tokens that are just a quote
+          if (
+            !processingSet &&
+            inlineMode &&
+            token.type === "string" &&
+            (token.value.startsWith('"') || token.value.startsWith("'"))
+          ) {
+            if (
+              !(
+                token.value.length === 3 &&
+                token.value[0] === token.value[2] &&
+                (token.value[1] === '"' || token.value[1] === "'")
+              )
+            ) {
+              formattedVTL += "\n" + currentIndent();
+              inlineMode = false;
+            }
+          }
+
           // If in a macro header, output tokens inline.
           if (inMacroHeader) {
             formattedVTL += token.value;
