@@ -9,9 +9,7 @@ import {
   tokenize,
   SIMPLE_DIRECTIVES,
 } from "@/lib/vtl";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Copy } from "lucide-react";
+import { Copy, Check, Sparkles, Code2, ArrowRight, Github, Zap } from "lucide-react";
 
 function App() {
   const [input, setInput] = useState("");
@@ -22,7 +20,6 @@ function App() {
   const formatVTL = useCallback(() => {
     setIsFormatting(true);
 
-    // Use setTimeout to allow UI to update before processing
     setTimeout(() => {
       try {
         const tokens = tokenize(input);
@@ -36,19 +33,15 @@ function App() {
         let lastTokenWasComment = false;
         let lastTokenWasVariable = false;
 
-        // Track when we're in a JSON key-value pair with a variable value
         let inJsonValueVar = false;
         let jsonVarBraceCount = 0;
 
-        // For handling inline macro headers
         let inMacroHeader = false;
         let macroParenCount = 0;
 
-        // For handling inline directive headers (parse, include, evaluate, define)
         let inDirectiveHeader = false;
         let directiveParenCount = 0;
 
-        // Track if we need to preserve spaces between tokens
         let lastTokenNeedsSpace = false;
 
         const currentIndent = () =>
@@ -58,23 +51,19 @@ function App() {
           const token = tokens[i];
           if (!token) continue;
 
-          // Skip newline tokens (we handle newlines ourselves)
           if (token.type === "newline") {
             continue;
           }
 
-          // Handle whitespace tokens - preserve spacing context
           if (token.type === "whitespace") {
             lastTokenNeedsSpace = true;
             continue;
           }
 
-          // Reset comment flag if token is not a comment
           if (token.type !== "comment" && token.type !== "multiline_comment") {
             lastTokenWasComment = false;
           }
 
-          // Handle unparsed content #[[...]]#
           if (token.type === "unparsed") {
             if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
               formattedVTL += "\n" + currentIndent();
@@ -85,7 +74,6 @@ function App() {
             continue;
           }
 
-          // Handle multi-line comments
           if (token.type === "multiline_comment") {
             if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
               formattedVTL += "\n" + currentIndent();
@@ -98,13 +86,11 @@ function App() {
             continue;
           }
 
-          // Check if we're starting a JSON key-value pair with a variable value
           if (
             token.type === "punctuation" &&
             token.value === ":" &&
             i + 1 < tokens.length
           ) {
-            // Look ahead, skipping whitespace
             let nextIdx = i + 1;
             while (nextIdx < tokens.length && tokens[nextIdx]?.type === "whitespace") {
               nextIdx++;
@@ -120,10 +106,8 @@ function App() {
             }
           }
 
-          // Handle variables in JSON values
           if (inJsonValueVar && token.type === "variable") {
             formattedVTL += token.value;
-            // Check if this is a complete variable reference
             if (
               token.value.startsWith("${") ||
               token.value.startsWith("$!{")
@@ -141,7 +125,6 @@ function App() {
             continue;
           }
 
-          // Handle braces as part of a complex variable reference
           if (inJsonValueVar && token.type === "punctuation") {
             formattedVTL += token.value;
 
@@ -157,13 +140,11 @@ function App() {
             continue;
           }
 
-          // Check if we need to insert a newline after a variable when followed by a JSON key
           if (
             lastTokenWasVariable &&
             token.type === "string" &&
             token.value.startsWith('"')
           ) {
-            // Look ahead to check if this is a JSON key
             let nextIdx = i + 1;
             while (nextIdx < tokens.length && tokens[nextIdx]?.type === "whitespace") {
               nextIdx++;
@@ -177,7 +158,6 @@ function App() {
             }
           }
 
-          // Handle inline tokens that are strings
           if (
             !processingSet &&
             !inJsonValueVar &&
@@ -185,7 +165,6 @@ function App() {
             token.type === "string" &&
             (token.value.startsWith('"') || token.value.startsWith("'"))
           ) {
-            // Check if this is a short single-character string (used in JSON)
             const isShortString =
               token.value.length === 3 &&
               ((token.value.startsWith('"') && token.value.endsWith('"')) ||
@@ -197,7 +176,6 @@ function App() {
             }
           }
 
-          // If in a macro header, output tokens inline
           if (inMacroHeader) {
             formattedVTL += token.value;
             if (token.type === "punctuation") {
@@ -215,7 +193,6 @@ function App() {
             continue;
           }
 
-          // If in a directive header (parse, include, evaluate), output tokens inline
           if (inDirectiveHeader) {
             formattedVTL += token.value;
             if (token.type === "punctuation") {
@@ -233,7 +210,6 @@ function App() {
             continue;
           }
 
-          // Handle #macro directive
           if (token.type === "directive" && token.value === "#macro") {
             if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
               formattedVTL += "\n" + currentIndent();
@@ -241,7 +217,6 @@ function App() {
               formattedVTL += currentIndent();
             }
             formattedVTL += token.value;
-            // Look ahead for opening paren
             let nextIdx = i + 1;
             while (nextIdx < tokens.length && tokens[nextIdx]?.type === "whitespace") {
               nextIdx++;
@@ -260,7 +235,6 @@ function App() {
           const directiveValue = token.value.trim();
           const directiveName = directiveValue.replace(/^#/, "").toLowerCase();
 
-          // Handle newlines for non-inline, non-JSON contexts
           if (
             !processingSet &&
             !inJsonValueVar &&
@@ -333,7 +307,6 @@ function App() {
                 );
                 needsNewline = true;
               } else if (directiveName === "define") {
-                // #define also creates a block that needs #end
                 const conditionResult = extractCondition(tokens, i + 1);
                 const condition = conditionResult.condition;
                 i = conditionResult.index;
@@ -343,7 +316,6 @@ function App() {
                 );
                 needsNewline = true;
               } else if (directiveName === "set") {
-                // Start a new #set on its own line unless it's the very first token
                 if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
                   formattedVTL += "\n" + currentIndent();
                 } else if (formattedVTL.endsWith("\n")) {
@@ -354,7 +326,6 @@ function App() {
                 inlineMode = true;
                 setParenCount = 0;
               } else if (SIMPLE_DIRECTIVES.includes(directiveName)) {
-                // Handle #parse, #include, #evaluate, #stop, #break
                 if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
                   formattedVTL += "\n" + currentIndent();
                 } else if (formattedVTL.endsWith("\n")) {
@@ -362,7 +333,6 @@ function App() {
                 }
                 formattedVTL += token.value;
 
-                // For directives with arguments, handle them inline
                 if (directiveName !== "stop" && directiveName !== "break") {
                   let nextIdx = i + 1;
                   while (nextIdx < tokens.length && tokens[nextIdx]?.type === "whitespace") {
@@ -379,7 +349,6 @@ function App() {
                   needsNewline = true;
                 }
               } else {
-                // Generic directive handling
                 if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
                   formattedVTL += "\n" + currentIndent();
                 } else if (formattedVTL.endsWith("\n")) {
@@ -393,7 +362,6 @@ function App() {
 
             case "punctuation":
               if (token.value === "{" && !inJsonValueVar) {
-                // Start a JSON block – force a new line and increase indent
                 if (!formattedVTL.endsWith("\n")) {
                   formattedVTL += "\n" + currentIndent();
                 } else {
@@ -405,12 +373,10 @@ function App() {
                 );
                 needsNewline = true;
               } else if (token.value === "}" && !inJsonValueVar) {
-                // End of a JSON block – reduce indent
                 indentStack.pop();
                 formattedVTL += "\n" + currentIndent() + token.value;
                 needsNewline = true;
               } else if (token.value === "[" && !inJsonValueVar && !processingSet) {
-                // Array start - check if it's a simple array or needs formatting
                 formattedVTL += token.value;
               } else if (token.value === "]" && !inJsonValueVar && !processingSet) {
                 formattedVTL += token.value;
@@ -425,7 +391,6 @@ function App() {
                     if (setParenCount === 0) {
                       processingSet = false;
                       inlineMode = false;
-                      // Force a newline after finishing the #set directive
                       formattedVTL += "\n" + currentIndent();
                     }
                     lastTokenNeedsSpace = false;
@@ -446,7 +411,6 @@ function App() {
               break;
 
             case "comment":
-              // Handle single-line comments
               if (lastTokenWasComment) {
                 formattedVTL += "\n" + currentIndent() + token.value;
               } else {
@@ -464,7 +428,6 @@ function App() {
               break;
 
             case "variable":
-              // Add space before variable if needed
               if (lastTokenNeedsSpace && formattedVTL.length > 0) {
                 const lastChar = formattedVTL[formattedVTL.length - 1];
                 if (lastChar && !/[\s(\[{:,]/.test(lastChar)) {
@@ -477,18 +440,15 @@ function App() {
               break;
 
             case "operator":
-              // Add spaces around operators
               if (formattedVTL.length > 0 && !formattedVTL.endsWith(" ") && !formattedVTL.endsWith("\n")) {
                 formattedVTL += " ";
               }
               formattedVTL += token.value;
-              // Add space after operator (will be handled by next token or we add it here)
               formattedVTL += " ";
               lastTokenNeedsSpace = false;
               break;
 
             case "keyword":
-              // Handle keywords like 'in', 'and', 'or', 'not', etc.
               if (lastTokenNeedsSpace && formattedVTL.length > 0) {
                 const lastChar = formattedVTL[formattedVTL.length - 1];
                 if (lastChar && !/[\s]/.test(lastChar)) {
@@ -534,7 +494,6 @@ function App() {
               break;
 
             case "text":
-              // Preserve space before text if needed
               if (lastTokenNeedsSpace && formattedVTL.length > 0) {
                 const lastChar = formattedVTL[formattedVTL.length - 1];
                 if (lastChar && !/[\s]/.test(lastChar)) {
@@ -558,9 +517,7 @@ function App() {
           }
         }
 
-        // Clean up multiple blank lines
         formattedVTL = formattedVTL.replace(/\n\s*\n/g, "\n");
-        // Clean up trailing spaces on lines
         formattedVTL = formattedVTL.replace(/ +$/gm, "");
         setOutput(formattedVTL.trim());
       } catch (error: unknown) {
@@ -581,124 +538,185 @@ function App() {
     }
   }, [output]);
 
+  const inputLineCount = input.split("\n").length;
+  const outputLineCount = output.split("\n").length;
+
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 font-sans text-white">
-      {/* Decorative elements */}
-      <div className="pointer-events-none absolute left-0 top-0 z-0 h-full w-full overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-80 w-80 rounded-full bg-blue-500 opacity-10 blur-3xl"></div>
-        <div className="absolute -right-20 top-1/2 h-80 w-80 rounded-full bg-blue-600 opacity-10 blur-3xl"></div>
-        <div className="absolute -bottom-40 left-1/3 h-80 w-80 rounded-full bg-blue-400 opacity-10 blur-3xl"></div>
+    <div className="fixed inset-0 overflow-hidden bg-[#09090b]">
+      {/* Background layers */}
+      <div className="grid-pattern absolute inset-0" />
+      <div className="noise-overlay" />
+      
+      {/* Ambient glow effects */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-[300px] -top-[300px] h-[600px] w-[600px] rounded-full bg-amber-500/5 blur-[120px]" />
+        <div className="absolute -bottom-[200px] -right-[200px] h-[500px] w-[500px] rounded-full bg-amber-600/5 blur-[100px]" />
+        <div className="absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-orange-500/3 blur-[80px]" />
       </div>
 
-      <div className="relative z-10 flex h-full flex-col p-4 sm:p-6">
-        <header className="mb-4 text-center">
-          <h1 className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-4xl font-extrabold text-transparent drop-shadow-lg md:text-5xl lg:text-6xl">
-            Apache Velocity Formatter
-          </h1>
-          <p className="mt-2 text-base text-blue-300/80 md:text-lg">
-            Format your Apache Velocity Template Language (VTL) code with ease
-          </p>
+      {/* Main content */}
+      <div className="relative z-10 flex h-full flex-col">
+        {/* Header */}
+        <header className="animate-fade-in-up border-b border-white/5 px-6 py-5 md:px-8">
+          <div className="mx-auto flex max-w-7xl items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/20">
+                <Code2 className="h-5 w-5 text-black" />
+              </div>
+              <div>
+                <h1 className="font-display text-xl font-semibold tracking-tight text-white md:text-2xl">
+                  VTL Formatter
+                </h1>
+                <p className="hidden text-sm text-zinc-500 md:block">
+                  Apache Velocity Template Language
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <a
+                href="https://github.com/sandepten/vtl-formatter"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 transition-all hover:border-white/20 hover:bg-white/10 hover:text-white"
+              >
+                <Github className="h-4 w-4" />
+              </a>
+            </div>
+          </div>
         </header>
 
-        <div className="flex flex-1 flex-col">
-          <main className="relative mx-auto flex w-full flex-1 flex-col gap-4 md:flex-row md:gap-6">
-            {/* Input Section */}
-            <section className="flex h-full flex-1 flex-col rounded-xl border border-white/5 bg-gray-900/50 p-4 shadow-xl backdrop-blur-md transition-all duration-200 md:p-6">
-              <h2 className="mb-2 text-lg font-semibold text-blue-300 md:mb-3">
-                Input VTL
-              </h2>
-              <div className="flex-1 overflow-hidden rounded-md border border-gray-800">
-                <Textarea
-                  className="h-full w-full border-0 bg-gray-800/50 font-mono focus-visible:ring-1 focus-visible:ring-blue-500"
+        {/* Main editor area */}
+        <main className="flex flex-1 flex-col overflow-hidden p-4 md:p-6 lg:p-8">
+          <div className="mx-auto flex h-full w-full max-w-7xl flex-1 flex-col gap-4 md:flex-row md:gap-6">
+            {/* Input Panel */}
+            <section className="animate-slide-in-left delay-100 panel flex h-full min-h-[300px] flex-1 flex-col rounded-2xl p-1 opacity-0 md:min-h-0">
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
+                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
+                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
+                  </div>
+                  <span className="font-display text-sm font-medium text-zinc-400">
+                    Input
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-zinc-600">
+                  <span>{inputLineCount} lines</span>
+                </div>
+              </div>
+              
+              <div className="code-editor flex-1 overflow-hidden rounded-xl">
+                <textarea
+                  className="h-full w-full resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-zinc-300 placeholder-zinc-600 focus:outline-none"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Paste your unformatted VTL here..."
+                  placeholder="Paste your unformatted VTL code here..."
+                  spellCheck={false}
                 />
               </div>
             </section>
 
-            {/* Format Button - Fixed width to prevent layout shift */}
-            <div className="flex items-center justify-center md:px-2">
-              <Button
+            {/* Center action area */}
+            <div className="animate-fade-in delay-200 flex flex-shrink-0 items-center justify-center opacity-0 md:flex-col md:gap-4 md:py-8">
+              <button
                 onClick={formatVTL}
-                className="min-w-[110px] bg-blue-600 px-3 py-2 font-medium text-white shadow-lg transition duration-300 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-700/20 disabled:pointer-events-none disabled:opacity-70 md:h-12 md:min-w-[110px]"
                 disabled={!input.trim() || isFormatting}
+                className="btn-shine group relative flex h-12 items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 font-display text-sm font-semibold text-black shadow-lg shadow-amber-500/25 transition-all hover:shadow-xl hover:shadow-amber-500/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none md:h-14 md:px-8"
               >
                 {isFormatting ? (
-                  <span className="mx-auto flex items-center whitespace-nowrap">
-                    <span className="animate-pulse">Format</span>
-                    <span className="ml-1 inline-flex animate-bounce">...</span>
-                  </span>
+                  <>
+                    <Sparkles className="h-4 w-4 animate-spin" />
+                    <span>Formatting...</span>
+                  </>
                 ) : (
-                  <span className="mx-auto flex items-center whitespace-nowrap">
+                  <>
+                    <Zap className="h-4 w-4 transition-transform group-hover:scale-110" />
                     <span>Format</span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="ml-1"
-                    >
-                      <path d="M5 12h14" />
-                      <path d="m12 5 7 7-7 7" />
-                    </svg>
-                  </span>
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </>
                 )}
-              </Button>
+              </button>
+              
+              {/* Decorative line */}
+              <div className="hidden h-24 w-px bg-gradient-to-b from-transparent via-zinc-700 to-transparent md:block" />
             </div>
 
-            {/* Output Section */}
-            <section className="relative flex h-full flex-1 flex-col rounded-xl border border-white/5 bg-gray-900/50 p-4 shadow-xl backdrop-blur-md transition-all duration-200 md:p-6">
-              <div className="mb-2 flex items-center justify-between md:mb-3">
-                <h2 className="text-lg font-semibold text-blue-300">
-                  Formatted VTL
-                </h2>
-                <Button
-                  onClick={handleCopy}
-                  size="sm"
-                  variant="ghost"
-                  className={`${
-                    copied
-                      ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
-                      : "text-gray-300 hover:bg-blue-500/20 hover:text-blue-300"
-                  } border transition-all duration-200`}
-                >
-                  <Copy size={16} className="mr-1" />
-                  {copied ? "Copied!" : "Copy"}
-                </Button>
+            {/* Output Panel */}
+            <section className="animate-slide-in-right delay-300 panel flex h-full min-h-[300px] flex-1 flex-col rounded-2xl p-1 opacity-0 md:min-h-0">
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    <div className="h-3 w-3 rounded-full bg-emerald-500/50" />
+                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
+                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
+                  </div>
+                  <span className="font-display text-sm font-medium text-zinc-400">
+                    Output
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-zinc-600">{output ? `${outputLineCount} lines` : ""}</span>
+                  <button
+                    onClick={handleCopy}
+                    disabled={!output}
+                    className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all ${
+                      copied
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                        : "border-white/10 bg-white/5 text-zinc-400 hover:border-white/20 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    }`}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-
-              <div className="flex-1 overflow-hidden rounded-md border border-gray-800">
-                <Textarea
-                  className="h-full w-full border-0 bg-gray-800/50 font-mono focus-visible:ring-1 focus-visible:ring-blue-500"
+              
+              <div className="code-editor flex-1 overflow-hidden rounded-xl">
+                <textarea
+                  className="h-full w-full resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-zinc-300 placeholder-zinc-600 focus:outline-none"
                   value={output}
                   readOnly
                   placeholder="Formatted VTL will appear here..."
+                  spellCheck={false}
                 />
               </div>
             </section>
-          </main>
+          </div>
+        </main>
 
-          {/* Attribution Footer */}
-          <footer className="mt-4 text-center">
-            <p className="text-xs text-white/40">
-              Made with Love -{" "}
+        {/* Footer */}
+        <footer className="animate-fade-in delay-400 border-t border-white/5 px-6 py-4 opacity-0">
+          <div className="mx-auto flex max-w-7xl items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 text-xs text-zinc-600">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span>All processing done locally</span>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-600">
+              Built by{" "}
               <a
                 href="https://github.com/sandepten"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="transition-colors hover:text-white/60 hover:underline"
+                className="text-zinc-400 transition-colors hover:text-amber-400"
               >
                 Sandeep Kumar
               </a>
             </p>
-          </footer>
-        </div>
+          </div>
+        </footer>
       </div>
     </div>
   );
