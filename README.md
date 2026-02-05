@@ -1,29 +1,42 @@
-# Create T3 App
+# VTL Formatter
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+A web-based formatter for Apache Velocity Template Language (VTL) code.
 
-## What's next? How do I make an app with this?
+**Live Demo:** [vtl-formatter.vercel.app](https://vtl-formatter.vercel.app/)
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+## Features
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+- Format and beautify VTL code with proper indentation
+- Support for all VTL directives (`#if`, `#foreach`, `#set`, `#macro`, `#parse`, `#include`, etc.)
+- Handles variables, method calls, and complex expressions
+- Multi-line and single-line comment support
+- Silent references (`$!variable`)
+- Range operators and alternate value syntax
+- All processing done locally in your browser
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+## Tech Stack
 
-## Learn More
+- [Next.js](https://nextjs.org) - React framework
+- [Tailwind CSS](https://tailwindcss.com) - Styling
+- [TypeScript](https://www.typescriptlang.org) - Type safety
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+## Development
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+```bash
+# Install dependencies
+bun install
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+# Run development server
+bun dev
 
-## How do I deploy this?
+# Build for production
+bun run build
+```
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+## License
+
+MIT
+
+## Author
+
+[Sandeep Kumar](https://github.com/sandepten)
