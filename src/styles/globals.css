@@ -4,10 +4,10 @@
 @plugin "tailwind-scrollbar";
 
 @theme {
-  /* Font Family - Using Geist fonts */
-  --font-display: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), "SF Mono", "Fira Code", monospace;
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  /* Font Family - Using Google Fonts */
+  --font-display: var(--font-display), "Space Grotesk", system-ui, sans-serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", "Fira Code", monospace;
+  --font-sans: var(--font-display), "Space Grotesk", system-ui, sans-serif;
 
   /* Custom Colors */
   --color-void: #09090b;

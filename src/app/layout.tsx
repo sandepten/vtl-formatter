@@ -1,9 +1,20 @@
 import { Analytics } from "@vercel/analytics/react";
 import "@/styles/globals.css";
 
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
 import { type Metadata } from "next";
+import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  weight: ["400", "500", "600"],
+});
 
 export const metadata: Metadata = {
   title: "VTL Formatter - Apache Velocity Template Language Formatter",
@@ -47,7 +58,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
       <head>
         <meta
