@@ -590,26 +590,26 @@ function App() {
         <main className="flex flex-1 flex-col overflow-hidden p-4 md:p-6 lg:p-8">
           <div className="mx-auto flex h-full w-full max-w-7xl flex-1 flex-col gap-4 md:flex-row md:gap-6">
             {/* Input Panel */}
-            <section className="animate-slide-in-left delay-100 panel flex h-full min-h-[300px] flex-1 flex-col rounded-2xl p-1 opacity-0 md:min-h-0">
+            <section className="animate-slide-in-left delay-100 flex h-full min-h-[300px] flex-1 flex-col rounded-2xl border border-zinc-800 bg-zinc-900/90 p-1 opacity-0 md:min-h-0">
               <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-3">
                   <div className="flex gap-1.5">
-                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
-                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
-                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
+                    <div className="h-3 w-3 rounded-full bg-zinc-600" />
+                    <div className="h-3 w-3 rounded-full bg-zinc-600" />
+                    <div className="h-3 w-3 rounded-full bg-zinc-600" />
                   </div>
-                  <span className="font-display text-sm font-medium text-zinc-400">
+                  <span className="font-display text-sm font-medium text-zinc-200">
                     Input
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-zinc-600">
+                <div className="flex items-center gap-2 text-xs text-zinc-400">
                   <span>{inputLineCount} lines</span>
                 </div>
               </div>
               
-              <div className="code-editor flex-1 overflow-hidden rounded-xl">
+              <div className="flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
                 <textarea
-                  className="h-full w-full resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-zinc-300 placeholder-zinc-600 focus:outline-none"
+                  className="h-full w-full resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-zinc-100 placeholder-zinc-500 focus:outline-none"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Paste your unformatted VTL code here..."
@@ -623,12 +623,12 @@ function App() {
               <button
                 onClick={formatVTL}
                 disabled={!input.trim() || isFormatting}
-                className="btn-shine group relative flex h-12 items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 font-display text-sm font-semibold text-black shadow-lg shadow-amber-500/25 transition-all hover:shadow-xl hover:shadow-amber-500/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none md:h-14 md:px-8"
+                className="btn-shine group relative flex h-12 w-[140px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 px-4 font-display text-sm font-semibold text-black shadow-lg shadow-amber-500/30 transition-all hover:from-amber-500 hover:to-amber-600 hover:shadow-xl hover:shadow-amber-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none md:h-14 md:w-[160px]"
               >
                 {isFormatting ? (
                   <>
                     <Sparkles className="h-4 w-4 animate-spin" />
-                    <span>Formatting...</span>
+                    <span>Formatting</span>
                   </>
                 ) : (
                   <>
@@ -640,31 +640,31 @@ function App() {
               </button>
               
               {/* Decorative line */}
-              <div className="hidden h-24 w-px bg-gradient-to-b from-transparent via-zinc-700 to-transparent md:block" />
+              <div className="hidden h-24 w-px bg-gradient-to-b from-transparent via-zinc-600 to-transparent md:block" />
             </div>
 
             {/* Output Panel */}
-            <section className="animate-slide-in-right delay-300 panel flex h-full min-h-[300px] flex-1 flex-col rounded-2xl p-1 opacity-0 md:min-h-0">
+            <section className="animate-slide-in-right delay-300 flex h-full min-h-[300px] flex-1 flex-col rounded-2xl border border-zinc-800 bg-zinc-900/90 p-1 opacity-0 md:min-h-0">
               <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-3">
                   <div className="flex gap-1.5">
-                    <div className="h-3 w-3 rounded-full bg-emerald-500/50" />
-                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
-                    <div className="h-3 w-3 rounded-full bg-zinc-700" />
+                    <div className="h-3 w-3 rounded-full bg-emerald-500" />
+                    <div className="h-3 w-3 rounded-full bg-zinc-600" />
+                    <div className="h-3 w-3 rounded-full bg-zinc-600" />
                   </div>
-                  <span className="font-display text-sm font-medium text-zinc-400">
+                  <span className="font-display text-sm font-medium text-zinc-200">
                     Output
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-zinc-600">{output ? `${outputLineCount} lines` : ""}</span>
+                  <span className="text-xs text-zinc-400">{output ? `${outputLineCount} lines` : ""}</span>
                   <button
                     onClick={handleCopy}
                     disabled={!output}
-                    className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all ${
+                    className={`flex h-8 w-[72px] items-center justify-center gap-1.5 rounded-lg border text-xs font-medium transition-all ${
                       copied
-                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                        : "border-white/10 bg-white/5 text-zinc-400 hover:border-white/20 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-400"
+                        : "border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                     }`}
                   >
                     {copied ? (
@@ -682,9 +682,9 @@ function App() {
                 </div>
               </div>
               
-              <div className="code-editor flex-1 overflow-hidden rounded-xl">
+              <div className="flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
                 <textarea
-                  className="h-full w-full resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-zinc-300 placeholder-zinc-600 focus:outline-none"
+                  className="h-full w-full resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-zinc-100 placeholder-zinc-500 focus:outline-none"
                   value={output}
                   readOnly
                   placeholder="Formatted VTL will appear here..."
@@ -696,21 +696,21 @@ function App() {
         </main>
 
         {/* Footer */}
-        <footer className="animate-fade-in delay-400 border-t border-white/5 px-6 py-4 opacity-0">
+        <footer className="animate-fade-in delay-400 border-t border-zinc-800 px-6 py-4 opacity-0">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2 text-xs text-zinc-600">
+              <div className="flex items-center gap-2 text-xs text-zinc-400">
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 <span>All processing done locally</span>
               </div>
             </div>
-            <p className="text-xs text-zinc-600">
+            <p className="text-xs text-zinc-400">
               Built by{" "}
               <a
                 href="https://github.com/sandepten"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-zinc-400 transition-colors hover:text-amber-400"
+                className="text-zinc-300 transition-colors hover:text-amber-400"
               >
                 Sandeep Kumar
               </a>
