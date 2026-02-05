@@ -7,6 +7,7 @@ import {
   isComplexVariableReference,
   normalizeLogicalOperators,
   tokenize,
+  SIMPLE_DIRECTIVES,
 } from "@/lib/vtl";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -32,16 +33,23 @@ function App() {
         let inlineMode = false;
         let processingSet = false;
         let setParenCount = 0;
-        let lastTokenWasComment = false; // For handling consecutive comments
-        let lastTokenWasVariable = false; // Track if the last token was a variable
+        let lastTokenWasComment = false;
+        let lastTokenWasVariable = false;
 
         // Track when we're in a JSON key-value pair with a variable value
         let inJsonValueVar = false;
         let jsonVarBraceCount = 0;
 
-        // For handling inline macro headers.
+        // For handling inline macro headers
         let inMacroHeader = false;
         let macroParenCount = 0;
+
+        // For handling inline directive headers (parse, include, evaluate, define)
+        let inDirectiveHeader = false;
+        let directiveParenCount = 0;
+
+        // Track if we need to preserve spaces between tokens
+        let lastTokenNeedsSpace = false;
 
         const currentIndent = () =>
           " ".repeat(indentStack[indentStack.length - 1]!);
@@ -50,44 +58,86 @@ function App() {
           const token = tokens[i];
           if (!token) continue;
 
-          // Reset comment flag if token is not a comment.
-          if (token.type !== "comment") {
+          // Skip newline tokens (we handle newlines ourselves)
+          if (token.type === "newline") {
+            continue;
+          }
+
+          // Handle whitespace tokens - preserve spacing context
+          if (token.type === "whitespace") {
+            lastTokenNeedsSpace = true;
+            continue;
+          }
+
+          // Reset comment flag if token is not a comment
+          if (token.type !== "comment" && token.type !== "multiline_comment") {
             lastTokenWasComment = false;
+          }
+
+          // Handle unparsed content #[[...]]#
+          if (token.type === "unparsed") {
+            if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
+              formattedVTL += "\n" + currentIndent();
+            }
+            formattedVTL += token.value;
+            needsNewline = true;
+            lastTokenNeedsSpace = false;
+            continue;
+          }
+
+          // Handle multi-line comments
+          if (token.type === "multiline_comment") {
+            if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
+              formattedVTL += "\n" + currentIndent();
+            } else if (formattedVTL.endsWith("\n")) {
+              formattedVTL += currentIndent();
+            }
+            formattedVTL += token.value;
+            needsNewline = true;
+            lastTokenNeedsSpace = false;
+            continue;
           }
 
           // Check if we're starting a JSON key-value pair with a variable value
           if (
             token.type === "punctuation" &&
             token.value === ":" &&
-            i + 1 < tokens.length &&
-            (tokens[i + 1]?.type === "variable" ||
-              isComplexVariableReference(tokens, i + 1))
+            i + 1 < tokens.length
           ) {
-            formattedVTL += token.value;
-            inJsonValueVar = true;
-            continue;
-          }
-
-          // Handle variables in JSON values (both simple $var and complex ${var} formats)
-          if (inJsonValueVar && token.type === "variable") {
-            formattedVTL += token.value;
-            // If this is the start of a complex variable reference with separate $ and {
+            // Look ahead, skipping whitespace
+            let nextIdx = i + 1;
+            while (nextIdx < tokens.length && tokens[nextIdx]?.type === "whitespace") {
+              nextIdx++;
+            }
             if (
-              token.value === "$" &&
-              i + 1 < tokens.length &&
-              tokens[i + 1]?.type === "punctuation" &&
-              tokens[i + 1]?.value === "{"
+              tokens[nextIdx]?.type === "variable" ||
+              isComplexVariableReference(tokens, nextIdx)
             ) {
-              // Don't set lastTokenWasVariable or modify inJsonValueVar yet - wait for the opening brace
+              formattedVTL += token.value + " ";
+              inJsonValueVar = true;
+              lastTokenNeedsSpace = false;
               continue;
             }
-            // If this is a complete variable reference or a simple $var
-            if (token.value.includes("{") && token.value.includes("}")) {
+          }
+
+          // Handle variables in JSON values
+          if (inJsonValueVar && token.type === "variable") {
+            formattedVTL += token.value;
+            // Check if this is a complete variable reference
+            if (
+              token.value.startsWith("${") ||
+              token.value.startsWith("$!{")
+            ) {
               inJsonValueVar = false;
-            } else if (!token.value.includes("{")) {
+            } else if (
+              !token.value.includes("{") &&
+              token.value !== "$" &&
+              token.value !== "$!"
+            ) {
               inJsonValueVar = false;
             }
             lastTokenWasVariable = true;
+            lastTokenNeedsSpace = false;
             continue;
           }
 
@@ -103,6 +153,7 @@ function App() {
                 inJsonValueVar = false;
               }
             }
+            lastTokenNeedsSpace = false;
             continue;
           }
 
@@ -110,16 +161,23 @@ function App() {
           if (
             lastTokenWasVariable &&
             token.type === "string" &&
-            token.value.startsWith('"') &&
-            i + 2 < tokens.length &&
-            tokens[i + 1]?.type === "punctuation" &&
-            tokens[i + 1]?.value === ":"
+            token.value.startsWith('"')
           ) {
-            formattedVTL += "\n" + currentIndent();
-            lastTokenWasVariable = false;
+            // Look ahead to check if this is a JSON key
+            let nextIdx = i + 1;
+            while (nextIdx < tokens.length && tokens[nextIdx]?.type === "whitespace") {
+              nextIdx++;
+            }
+            if (
+              tokens[nextIdx]?.type === "punctuation" &&
+              tokens[nextIdx]?.value === ":"
+            ) {
+              formattedVTL += "\n" + currentIndent();
+              lastTokenWasVariable = false;
+            }
           }
 
-          // NEW: Avoid inserting a newline for inline tokens that are just a quote
+          // Handle inline tokens that are strings
           if (
             !processingSet &&
             !inJsonValueVar &&
@@ -127,19 +185,19 @@ function App() {
             token.type === "string" &&
             (token.value.startsWith('"') || token.value.startsWith("'"))
           ) {
-            if (
-              !(
-                token.value.length === 3 &&
-                ((token.value.startsWith('"') && token.value.endsWith('"')) ||
-                  (token.value.startsWith("'") && token.value.endsWith("'")))
-              )
-            ) {
+            // Check if this is a short single-character string (used in JSON)
+            const isShortString =
+              token.value.length === 3 &&
+              ((token.value.startsWith('"') && token.value.endsWith('"')) ||
+                (token.value.startsWith("'") && token.value.endsWith("'")));
+
+            if (!isShortString) {
               formattedVTL += "\n" + currentIndent();
               inlineMode = false;
             }
           }
 
-          // If in a macro header, output tokens inline.
+          // If in a macro header, output tokens inline
           if (inMacroHeader) {
             formattedVTL += token.value;
             if (token.type === "punctuation") {
@@ -149,28 +207,60 @@ function App() {
                 macroParenCount--;
                 if (macroParenCount === 0) {
                   inMacroHeader = false;
+                  needsNewline = true;
                 }
               }
             }
+            lastTokenNeedsSpace = false;
             continue;
           }
 
-          // Special handling: if we see a #macro directive, output its header inline.
-          if (token.type === "directive" && token.value === "#macro") {
+          // If in a directive header (parse, include, evaluate), output tokens inline
+          if (inDirectiveHeader) {
             formattedVTL += token.value;
+            if (token.type === "punctuation") {
+              if (token.value === "(") {
+                directiveParenCount++;
+              } else if (token.value === ")") {
+                directiveParenCount--;
+                if (directiveParenCount === 0) {
+                  inDirectiveHeader = false;
+                  needsNewline = true;
+                }
+              }
+            }
+            lastTokenNeedsSpace = false;
+            continue;
+          }
+
+          // Handle #macro directive
+          if (token.type === "directive" && token.value === "#macro") {
+            if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
+              formattedVTL += "\n" + currentIndent();
+            } else if (formattedVTL.endsWith("\n")) {
+              formattedVTL += currentIndent();
+            }
+            formattedVTL += token.value;
+            // Look ahead for opening paren
+            let nextIdx = i + 1;
+            while (nextIdx < tokens.length && tokens[nextIdx]?.type === "whitespace") {
+              nextIdx++;
+            }
             if (
-              tokens[i + 1] &&
-              tokens[i + 1]!.type === "punctuation" &&
-              tokens[i + 1]!.value === "("
+              tokens[nextIdx]?.type === "punctuation" &&
+              tokens[nextIdx]?.value === "("
             ) {
               inMacroHeader = true;
               macroParenCount = 0;
             }
+            lastTokenNeedsSpace = false;
             continue;
           }
 
           const directiveValue = token.value.trim();
+          const directiveName = directiveValue.replace(/^#/, "").toLowerCase();
 
+          // Handle newlines for non-inline, non-JSON contexts
           if (
             !processingSet &&
             !inJsonValueVar &&
@@ -204,67 +294,106 @@ function App() {
                 indentStack.pop();
                 formattedVTL += "\n" + currentIndent() + token.value;
                 needsNewline = true;
-              } else if (directiveValue.startsWith("#elseif")) {
+              } else if (directiveName === "elseif") {
                 indentStack.pop();
                 const conditionResult = extractCondition(tokens, i + 1);
                 let condition = conditionResult.condition;
                 condition = normalizeLogicalOperators(condition);
                 i = conditionResult.index;
-                formattedVTL += "\n" + currentIndent() + "#elseif " + condition;
+                formattedVTL += "\n" + currentIndent() + "#elseif" + condition;
                 indentStack.push(
                   indentStack[indentStack.length - 1]! + indentSize,
                 );
                 needsNewline = true;
-              } else if (directiveValue.startsWith("#else")) {
+              } else if (directiveName === "else") {
                 indentStack.pop();
                 formattedVTL += "\n" + currentIndent() + "#else";
                 indentStack.push(
                   indentStack[indentStack.length - 1]! + indentSize,
                 );
                 needsNewline = true;
-              } else if (directiveValue.startsWith("#if")) {
+              } else if (directiveName === "if") {
                 const conditionResult = extractCondition(tokens, i + 1);
                 let condition = conditionResult.condition;
                 condition = normalizeLogicalOperators(condition);
                 i = conditionResult.index;
-                formattedVTL += "\n" + currentIndent() + "#if " + condition;
+                formattedVTL += "\n" + currentIndent() + "#if" + condition;
                 indentStack.push(
                   indentStack[indentStack.length - 1]! + indentSize,
                 );
                 needsNewline = true;
-              } else if (directiveValue.startsWith("#foreach")) {
+              } else if (directiveName === "foreach") {
                 const conditionResult = extractCondition(tokens, i + 1);
                 let condition = conditionResult.condition;
                 condition = adjustForEachCondition(condition);
                 i = conditionResult.index;
-                formattedVTL +=
-                  "\n" + currentIndent() + "#foreach " + condition;
+                formattedVTL += "\n" + currentIndent() + "#foreach" + condition;
                 indentStack.push(
                   indentStack[indentStack.length - 1]! + indentSize,
                 );
                 needsNewline = true;
-              } else if (directiveValue.startsWith("#set")) {
-                // Always start a new #set on its own line unless it's the very first token.
+              } else if (directiveName === "define") {
+                // #define also creates a block that needs #end
+                const conditionResult = extractCondition(tokens, i + 1);
+                const condition = conditionResult.condition;
+                i = conditionResult.index;
+                formattedVTL += "\n" + currentIndent() + "#define" + condition;
+                indentStack.push(
+                  indentStack[indentStack.length - 1]! + indentSize,
+                );
+                needsNewline = true;
+              } else if (directiveName === "set") {
+                // Start a new #set on its own line unless it's the very first token
                 if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
                   formattedVTL += "\n" + currentIndent();
+                } else if (formattedVTL.endsWith("\n")) {
+                  formattedVTL += currentIndent();
                 }
                 formattedVTL += token.value;
                 processingSet = true;
                 inlineMode = true;
                 setParenCount = 0;
-              } else {
-                formattedVTL += "\n" + currentIndent() + token.value;
-                if (directiveValue.startsWith("#foreach")) {
-                  indentStack.push(
-                    indentStack[indentStack.length - 1]! + indentSize,
-                  );
+              } else if (SIMPLE_DIRECTIVES.includes(directiveName)) {
+                // Handle #parse, #include, #evaluate, #stop, #break
+                if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
+                  formattedVTL += "\n" + currentIndent();
+                } else if (formattedVTL.endsWith("\n")) {
+                  formattedVTL += currentIndent();
                 }
+                formattedVTL += token.value;
+
+                // For directives with arguments, handle them inline
+                if (directiveName !== "stop" && directiveName !== "break") {
+                  let nextIdx = i + 1;
+                  while (nextIdx < tokens.length && tokens[nextIdx]?.type === "whitespace") {
+                    nextIdx++;
+                  }
+                  if (
+                    tokens[nextIdx]?.type === "punctuation" &&
+                    tokens[nextIdx]?.value === "("
+                  ) {
+                    inDirectiveHeader = true;
+                    directiveParenCount = 0;
+                  }
+                } else {
+                  needsNewline = true;
+                }
+              } else {
+                // Generic directive handling
+                if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
+                  formattedVTL += "\n" + currentIndent();
+                } else if (formattedVTL.endsWith("\n")) {
+                  formattedVTL += currentIndent();
+                }
+                formattedVTL += token.value;
                 needsNewline = true;
               }
+              lastTokenNeedsSpace = false;
               break;
+
             case "punctuation":
               if (token.value === "{" && !inJsonValueVar) {
-                // Start a JSON block – force a new line and increase indent.
+                // Start a JSON block – force a new line and increase indent
                 if (!formattedVTL.endsWith("\n")) {
                   formattedVTL += "\n" + currentIndent();
                 } else {
@@ -276,10 +405,15 @@ function App() {
                 );
                 needsNewline = true;
               } else if (token.value === "}" && !inJsonValueVar) {
-                // End of a JSON block – reduce indent.
+                // End of a JSON block – reduce indent
                 indentStack.pop();
                 formattedVTL += "\n" + currentIndent() + token.value;
                 needsNewline = true;
+              } else if (token.value === "[" && !inJsonValueVar && !processingSet) {
+                // Array start - check if it's a simple array or needs formatting
+                formattedVTL += token.value;
+              } else if (token.value === "]" && !inJsonValueVar && !processingSet) {
+                formattedVTL += token.value;
               } else if (token.value === "(" || token.value === ")") {
                 if (processingSet) {
                   if (token.value === "(") {
@@ -287,15 +421,15 @@ function App() {
                     formattedVTL += token.value;
                   } else if (token.value === ")") {
                     setParenCount--;
-                    // Append the closing parenthesis.
                     formattedVTL += token.value;
                     if (setParenCount === 0) {
                       processingSet = false;
                       inlineMode = false;
-                      // Force a newline after finishing the #set directive.
+                      // Force a newline after finishing the #set directive
                       formattedVTL += "\n" + currentIndent();
                     }
-                    continue; // Skip further processing for this token.
+                    lastTokenNeedsSpace = false;
+                    continue;
                   }
                 } else {
                   formattedVTL += token.value;
@@ -303,33 +437,131 @@ function App() {
               } else if (token.value === "," && !inJsonValueVar) {
                 formattedVTL += token.value;
                 needsNewline = true;
+              } else if (token.value === ":") {
+                formattedVTL += token.value + " ";
               } else {
                 formattedVTL += token.value;
               }
+              lastTokenNeedsSpace = false;
               break;
+
             case "comment":
-              // If the previous token was a comment, force a newline before this one.
+              // Handle single-line comments
               if (lastTokenWasComment) {
                 formattedVTL += "\n" + currentIndent() + token.value;
               } else {
-                if (formattedVTL && !formattedVTL.endsWith("\n")) {
+                if (formattedVTL && !formattedVTL.endsWith("\n") && !formattedVTL.endsWith(" ")) {
                   formattedVTL += " " + token.value;
+                } else if (formattedVTL.endsWith("\n")) {
+                  formattedVTL += currentIndent() + token.value;
                 } else {
                   formattedVTL += token.value;
                 }
               }
               lastTokenWasComment = true;
+              needsNewline = true;
+              lastTokenNeedsSpace = false;
               break;
+
             case "variable":
+              // Add space before variable if needed
+              if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+                const lastChar = formattedVTL[formattedVTL.length - 1];
+                if (lastChar && !/[\s(\[{:,]/.test(lastChar)) {
+                  formattedVTL += " ";
+                }
+              }
               formattedVTL += token.value;
               lastTokenWasVariable = true;
+              lastTokenNeedsSpace = false;
               break;
-            default:
+
+            case "operator":
+              // Add spaces around operators
+              if (formattedVTL.length > 0 && !formattedVTL.endsWith(" ") && !formattedVTL.endsWith("\n")) {
+                formattedVTL += " ";
+              }
               formattedVTL += token.value;
-              lastTokenWasVariable = token.type === "variable";
+              // Add space after operator (will be handled by next token or we add it here)
+              formattedVTL += " ";
+              lastTokenNeedsSpace = false;
+              break;
+
+            case "keyword":
+              // Handle keywords like 'in', 'and', 'or', 'not', etc.
+              if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+                const lastChar = formattedVTL[formattedVTL.length - 1];
+                if (lastChar && !/[\s]/.test(lastChar)) {
+                  formattedVTL += " ";
+                }
+              }
+              formattedVTL += token.value;
+              lastTokenNeedsSpace = true;
+              break;
+
+            case "string":
+              if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+                const lastChar = formattedVTL[formattedVTL.length - 1];
+                if (lastChar && !/[\s(\[{:,]/.test(lastChar)) {
+                  formattedVTL += " ";
+                }
+              }
+              formattedVTL += token.value;
+              lastTokenWasVariable = false;
+              lastTokenNeedsSpace = false;
+              break;
+
+            case "number":
+              if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+                const lastChar = formattedVTL[formattedVTL.length - 1];
+                if (lastChar && !/[\s(\[{:,]/.test(lastChar)) {
+                  formattedVTL += " ";
+                }
+              }
+              formattedVTL += token.value;
+              lastTokenNeedsSpace = false;
+              break;
+
+            case "identifier":
+              if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+                const lastChar = formattedVTL[formattedVTL.length - 1];
+                if (lastChar && !/[\s(\[{:,]/.test(lastChar)) {
+                  formattedVTL += " ";
+                }
+              }
+              formattedVTL += token.value;
+              lastTokenNeedsSpace = false;
+              break;
+
+            case "text":
+              // Preserve space before text if needed
+              if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+                const lastChar = formattedVTL[formattedVTL.length - 1];
+                if (lastChar && !/[\s]/.test(lastChar)) {
+                  formattedVTL += " ";
+                }
+              }
+              formattedVTL += token.value;
+              lastTokenNeedsSpace = false;
+              break;
+
+            default:
+              if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+                const lastChar = formattedVTL[formattedVTL.length - 1];
+                if (lastChar && !/[\s(\[{:,]/.test(lastChar)) {
+                  formattedVTL += " ";
+                }
+              }
+              formattedVTL += token.value;
+              lastTokenWasVariable = false;
+              lastTokenNeedsSpace = false;
           }
         }
+
+        // Clean up multiple blank lines
         formattedVTL = formattedVTL.replace(/\n\s*\n/g, "\n");
+        // Clean up trailing spaces on lines
+        formattedVTL = formattedVTL.replace(/ +$/gm, "");
         setOutput(formattedVTL.trim());
       } catch (error: unknown) {
         console.error("Error formatting VTL:", error);
