@@ -12,6 +12,8 @@ A web-based formatter for Apache Velocity Template Language (VTL) code.
 - Multi-line and single-line comment support
 - Silent references (`$!variable`)
 - Range operators and alternate value syntax
+- Preserves HTML/XML tags in mixed VTL templates
+- Hybrid mixed-content formatting: keeps non-VTL structure stable while formatting VTL boundaries
 - All processing done locally in your browser
 
 ## Tech Stack
@@ -31,6 +33,9 @@ bun dev
 
 # Build for production
 bun run build
+
+# Run formatter regression tests
+bun run test
 ```
 
 ## License

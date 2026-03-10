@@ -1,5 +1,65 @@
 import type { Token } from "@/types";
 
+function tryReadMarkupTag(
+  source: string,
+  startIndex: number,
+): { value: string; nextIndex: number } | null {
+  if (source[startIndex] !== "<") {
+    return null;
+  }
+
+  const nextChar = source[startIndex + 1];
+  const nextNextChar = source[startIndex + 2];
+  const startsLikeTag =
+    /[a-zA-Z]/.test(nextChar ?? "") ||
+    (nextChar === "/" && /[a-zA-Z]/.test(nextNextChar ?? "")) ||
+    nextChar === "!" ||
+    nextChar === "?";
+
+  if (!startsLikeTag) {
+    return null;
+  }
+
+  let index = startIndex + 1;
+  let quote: '"' | "'" | null = null;
+
+  while (index < source.length) {
+    const current = source[index];
+    if (!current) {
+      break;
+    }
+
+    if (quote) {
+      if (current === "\\" && index + 1 < source.length) {
+        index += 2;
+        continue;
+      }
+      if (current === quote) {
+        quote = null;
+      }
+      index++;
+      continue;
+    }
+
+    if (current === '"' || current === "'") {
+      quote = current;
+      index++;
+      continue;
+    }
+
+    if (current === ">") {
+      return {
+        value: source.slice(startIndex, index + 1),
+        nextIndex: index + 1,
+      };
+    }
+
+    index++;
+  }
+
+  return null;
+}
+
 export function tokenize(vtl: string): Token[] {
   const tokens: Token[] = [];
   let current = 0;
@@ -297,6 +357,13 @@ export function tokenize(vtl: string): Token[] {
       continue;
     }
 
+    const markupTag = tryReadMarkupTag(vtl, current);
+    if (markupTag) {
+      tokens.push({ type: "markup", value: markupTag.value });
+      current = markupTag.nextIndex;
+      continue;
+    }
+
     // Handle range operator ..
     if (char === "." && vtl[current + 1] === ".") {
       tokens.push({ type: "operator", value: ".." });
@@ -416,9 +483,37 @@ export function tokenize(vtl: string): Token[] {
       continue;
     }
 
-    // Any other character is treated as text
-    tokens.push({ type: "text", value: char });
+    // Preserve unknown literal runs without normalization.
+    let rawText = char;
     current++;
+    while (current < vtl.length) {
+      const rawChar = vtl[current];
+      if (
+        !rawChar ||
+        rawChar === "#" ||
+        rawChar === "$" ||
+        rawChar === "<" ||
+        /[\s{}[\]:,()]/.test(rawChar) ||
+        /[a-zA-Z0-9]/.test(rawChar) ||
+        rawChar === '"' ||
+        rawChar === "'" ||
+        rawChar === "." ||
+        rawChar === "=" ||
+        rawChar === "+" ||
+        rawChar === "-" ||
+        rawChar === "*" ||
+        rawChar === "/" ||
+        rawChar === "%" ||
+        rawChar === "!" ||
+        rawChar === "&" ||
+        rawChar === "|"
+      ) {
+        break;
+      }
+      rawText += rawChar;
+      current++;
+    }
+    tokens.push({ type: "raw_text", value: rawText });
   }
 
   return tokens;

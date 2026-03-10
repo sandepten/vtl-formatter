@@ -5,6 +5,8 @@ export type TokenType =
   | "comment"
   | "multiline_comment"
   | "unparsed"
+  | "markup"
+  | "raw_text"
   | "punctuation"
   | "operator"
   | "keyword"
