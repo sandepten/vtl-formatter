@@ -209,7 +209,11 @@ export function formatVtlTemplate(input: string): string {
     }
 
     if (inMacroHeader) {
-      if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+      if (
+        lastTokenNeedsSpace &&
+        formattedVTL.length > 0 &&
+        token.value !== ")"
+      ) {
         const lastChar = formattedVTL[formattedVTL.length - 1];
         if (lastChar && !/[\s(]/.test(lastChar)) {
           formattedVTL += " ";
@@ -232,9 +236,18 @@ export function formatVtlTemplate(input: string): string {
     }
 
     if (inDirectiveHeader) {
-      if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+      if (
+        lastTokenNeedsSpace &&
+        formattedVTL.length > 0 &&
+        token.value !== ")"
+      ) {
         const lastChar = formattedVTL[formattedVTL.length - 1];
-        if (lastChar && !/[\s(,]/.test(lastChar)) {
+        if (
+          lastChar &&
+          lastChar !== " " &&
+          lastChar !== "(" &&
+          lastChar !== ","
+        ) {
           formattedVTL += " ";
         }
       }
