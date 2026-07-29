@@ -29,14 +29,67 @@ export function formatVtlTemplate(input: string): string {
   let directiveParenCount = 0;
 
   let lastTokenNeedsSpace = false;
+  let pendingNewlines = 0;
 
   const currentIndent = () => " ".repeat(indentStack[indentStack.length - 1]!);
+
+  /**
+   * Build a line prefix without double-counting breaks.
+   * pendingNewlines=2 means one intentional blank line between blocks.
+   */
+  const takeLinePrefix = (force = true): string => {
+    if (inlineMode || inJsonValueVar) {
+      if (!force) {
+        return "";
+      }
+    }
+
+    if (formattedVTL.length === 0) {
+      pendingNewlines = 0;
+      needsNewline = false;
+      return "";
+    }
+
+    const wantBreak = force || needsNewline || pendingNewlines > 0;
+    if (!wantBreak) {
+      return "";
+    }
+
+    const totalNewlines = Math.max(
+      force || needsNewline ? 1 : 0,
+      pendingNewlines,
+    );
+
+    formattedVTL = formattedVTL.replace(/[ \t]+$/g, "");
+
+    let trailing = 0;
+    for (
+      let j = formattedVTL.length - 1;
+      j >= 0 && formattedVTL[j] === "\n";
+      j--
+    ) {
+      trailing++;
+    }
+
+    pendingNewlines = 0;
+    needsNewline = false;
+
+    const toAdd = Math.max(0, totalNewlines - trailing);
+    return "\n".repeat(toAdd) + currentIndent();
+  };
+
+  const appendOnOwnLine = (value: string) => {
+    formattedVTL += takeLinePrefix(true) + value;
+  };
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     if (!token) continue;
 
     if (token.type === "newline") {
+      const count = token.value.length;
+      pendingNewlines = Math.max(pendingNewlines, count);
+      needsNewline = true;
       continue;
     }
 
@@ -50,22 +103,14 @@ export function formatVtlTemplate(input: string): string {
     }
 
     if (token.type === "unparsed") {
-      if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
-        formattedVTL += "\n" + currentIndent();
-      }
-      formattedVTL += token.value;
+      appendOnOwnLine(token.value);
       needsNewline = true;
       lastTokenNeedsSpace = false;
       continue;
     }
 
     if (token.type === "multiline_comment") {
-      if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
-        formattedVTL += "\n" + currentIndent();
-      } else if (formattedVTL.endsWith("\n")) {
-        formattedVTL += currentIndent();
-      }
-      formattedVTL += token.value;
+      appendOnOwnLine(token.value);
       needsNewline = true;
       lastTokenNeedsSpace = false;
       continue;
@@ -141,7 +186,7 @@ export function formatVtlTemplate(input: string): string {
         tokens[nextIdx]?.type === "punctuation" &&
         tokens[nextIdx]?.value === ":"
       ) {
-        formattedVTL += "\n" + currentIndent();
+        formattedVTL += takeLinePrefix(true);
         lastTokenWasVariable = false;
       }
     }
@@ -159,7 +204,7 @@ export function formatVtlTemplate(input: string): string {
           (token.value.startsWith("'") && token.value.endsWith("'")));
 
       if (!isShortString) {
-        formattedVTL += "\n" + currentIndent();
+        formattedVTL += takeLinePrefix(true);
         inlineMode = false;
       }
     }
@@ -199,12 +244,7 @@ export function formatVtlTemplate(input: string): string {
     }
 
     if (token.type === "directive" && token.value === "#macro") {
-      if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
-        formattedVTL += "\n" + currentIndent();
-      } else if (formattedVTL.endsWith("\n")) {
-        formattedVTL += currentIndent();
-      }
-      formattedVTL += token.value;
+      appendOnOwnLine(token.value);
       let nextIdx = i + 1;
       while (
         nextIdx < tokens.length &&
@@ -233,13 +273,23 @@ export function formatVtlTemplate(input: string): string {
       token.type === "string" &&
       token.value.startsWith('"')
     ) {
-      formattedVTL += "\n" + currentIndent();
+      formattedVTL += takeLinePrefix(true);
       inlineMode = false;
     }
 
-    if (needsNewline && !inlineMode && !inJsonValueVar) {
-      formattedVTL += "\n" + currentIndent();
-      needsNewline = false;
+    // Self-prefixing tokens manage their own breaks via takeLinePrefix/appendOnOwnLine
+    const selfPrefixes =
+      token.type === "directive" ||
+      (token.type === "punctuation" &&
+        (token.value === "{" || token.value === "}"));
+
+    if (
+      !selfPrefixes &&
+      (needsNewline || pendingNewlines > 0) &&
+      !inlineMode &&
+      !inJsonValueVar
+    ) {
+      formattedVTL += takeLinePrefix(false);
     }
 
     if (
@@ -249,7 +299,7 @@ export function formatVtlTemplate(input: string): string {
       !directiveValue.startsWith("#set") &&
       inlineMode
     ) {
-      formattedVTL += "\n" + currentIndent();
+      formattedVTL += takeLinePrefix(true);
       inlineMode = false;
     }
 
@@ -257,7 +307,7 @@ export function formatVtlTemplate(input: string): string {
       case "directive":
         if (directiveValue === "#end") {
           indentStack.pop();
-          formattedVTL += "\n" + currentIndent() + token.value;
+          appendOnOwnLine(token.value);
           needsNewline = true;
         } else if (directiveName === "elseif") {
           indentStack.pop();
@@ -265,12 +315,12 @@ export function formatVtlTemplate(input: string): string {
           let condition = conditionResult.condition;
           condition = normalizeLogicalOperators(condition);
           i = conditionResult.index;
-          formattedVTL += "\n" + currentIndent() + "#elseif" + condition;
+          appendOnOwnLine("#elseif" + condition);
           indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
           needsNewline = true;
         } else if (directiveName === "else") {
           indentStack.pop();
-          formattedVTL += "\n" + currentIndent() + "#else";
+          appendOnOwnLine("#else");
           indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
           needsNewline = true;
         } else if (directiveName === "if") {
@@ -278,7 +328,7 @@ export function formatVtlTemplate(input: string): string {
           let condition = conditionResult.condition;
           condition = normalizeLogicalOperators(condition);
           i = conditionResult.index;
-          formattedVTL += "\n" + currentIndent() + "#if" + condition;
+          appendOnOwnLine("#if" + condition);
           indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
           needsNewline = true;
         } else if (directiveName === "foreach") {
@@ -286,33 +336,23 @@ export function formatVtlTemplate(input: string): string {
           let condition = conditionResult.condition;
           condition = adjustForEachCondition(condition);
           i = conditionResult.index;
-          formattedVTL += "\n" + currentIndent() + "#foreach" + condition;
+          appendOnOwnLine("#foreach" + condition);
           indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
           needsNewline = true;
         } else if (directiveName === "define") {
           const conditionResult = extractCondition(tokens, i + 1);
           const condition = conditionResult.condition;
           i = conditionResult.index;
-          formattedVTL += "\n" + currentIndent() + "#define" + condition;
+          appendOnOwnLine("#define" + condition);
           indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
           needsNewline = true;
         } else if (directiveName === "set") {
-          if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
-            formattedVTL += "\n" + currentIndent();
-          } else if (formattedVTL.endsWith("\n")) {
-            formattedVTL += currentIndent();
-          }
-          formattedVTL += token.value;
+          appendOnOwnLine(token.value);
           processingSet = true;
           inlineMode = true;
           setParenCount = 0;
         } else if (SIMPLE_DIRECTIVES.includes(directiveName)) {
-          if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
-            formattedVTL += "\n" + currentIndent();
-          } else if (formattedVTL.endsWith("\n")) {
-            formattedVTL += currentIndent();
-          }
-          formattedVTL += token.value;
+          appendOnOwnLine(token.value);
 
           if (directiveName !== "stop" && directiveName !== "break") {
             let nextIdx = i + 1;
@@ -333,12 +373,7 @@ export function formatVtlTemplate(input: string): string {
             needsNewline = true;
           }
         } else {
-          if (formattedVTL.length > 0 && !formattedVTL.endsWith("\n")) {
-            formattedVTL += "\n" + currentIndent();
-          } else if (formattedVTL.endsWith("\n")) {
-            formattedVTL += currentIndent();
-          }
-          formattedVTL += token.value;
+          appendOnOwnLine(token.value);
           needsNewline = true;
         }
         lastTokenNeedsSpace = false;
@@ -346,17 +381,12 @@ export function formatVtlTemplate(input: string): string {
 
       case "punctuation":
         if (token.value === "{" && !inJsonValueVar) {
-          if (!formattedVTL.endsWith("\n")) {
-            formattedVTL += "\n" + currentIndent();
-          } else {
-            formattedVTL += currentIndent();
-          }
-          formattedVTL += token.value;
+          appendOnOwnLine(token.value);
           indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
           needsNewline = true;
         } else if (token.value === "}" && !inJsonValueVar) {
           indentStack.pop();
-          formattedVTL += "\n" + currentIndent() + token.value;
+          appendOnOwnLine(token.value);
           needsNewline = true;
         } else if (token.value === "[" && !inJsonValueVar && !processingSet) {
           formattedVTL += token.value;
@@ -377,7 +407,7 @@ export function formatVtlTemplate(input: string): string {
               if (setParenCount === 0) {
                 processingSet = false;
                 inlineMode = false;
-                formattedVTL += "\n" + currentIndent();
+                needsNewline = true;
               }
               lastTokenNeedsSpace = false;
               continue;
@@ -398,7 +428,7 @@ export function formatVtlTemplate(input: string): string {
 
       case "comment":
         if (lastTokenWasComment) {
-          formattedVTL += "\n" + currentIndent() + token.value;
+          appendOnOwnLine(token.value);
         } else if (
           formattedVTL &&
           !formattedVTL.endsWith("\n") &&
@@ -481,7 +511,8 @@ export function formatVtlTemplate(input: string): string {
     }
   }
 
-  formattedVTL = formattedVTL.replace(/\n\s*\n/g, "\n");
   formattedVTL = formattedVTL.replace(/ +$/gm, "");
+  // Keep at most one blank line between blocks; never collapse all blanks away
+  formattedVTL = formattedVTL.replace(/\n{3,}/g, "\n\n");
   return formattedVTL.trim();
 }

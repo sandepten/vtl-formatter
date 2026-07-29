@@ -422,20 +422,22 @@ export function tokenize(vtl: string): Token[] {
       continue;
     }
 
-    // Handle whitespace - PRESERVE spaces, only normalize consecutive spaces to single space
+    // Handle whitespace - PRESERVE spaces; preserve newline count for blank lines
     if (/\s/.test(char)) {
       let value = "";
-      const hasNewline = char === "\n";
-      
+      let newlineCount = 0;
+
       // Collect all consecutive whitespace
       while (current < vtl.length && /\s/.test(vtl[current]!)) {
+        if (vtl[current] === "\n") {
+          newlineCount++;
+        }
         value += vtl[current];
         current++;
       }
-      
-      // Check if there's a newline in the whitespace
-      if (hasNewline || value.includes("\n")) {
-        tokens.push({ type: "newline", value: "\n" });
+
+      if (newlineCount > 0) {
+        tokens.push({ type: "newline", value: "\n".repeat(newlineCount) });
       } else {
         // Preserve a single space for non-newline whitespace
         tokens.push({ type: "whitespace", value: " " });
