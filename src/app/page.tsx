@@ -1,28 +1,36 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { formatVtlTemplate } from "@/lib/format-vtl";
-import { Copy, Check, Sparkles, Code2, ArrowRight, Github, Zap } from "lucide-react";
+import { Copy, Check, Code2, ArrowRight, Github, Zap } from "lucide-react";
 
 function App() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [copied, setCopied] = useState(false);
-  const [isFormatting, setIsFormatting] = useState(false);
 
   const formatVTL = useCallback(() => {
-    setIsFormatting(true);
+    if (!input.trim()) return;
 
-    setTimeout(() => {
-      try {
-        setOutput(formatVtlTemplate(input));
-      } catch (error: unknown) {
-        console.error("Error formatting VTL:", error);
-        setOutput(`Error: ${(error as Error).message}`);
-      }
-      setIsFormatting(false);
-    }, 300);
+    try {
+      setOutput(formatVtlTemplate(input));
+    } catch (error: unknown) {
+      console.error("Error formatting VTL:", error);
+      setOutput(`Error: ${(error as Error).message}`);
+    }
   }, [input]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        formatVTL();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [formatVTL]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -42,7 +50,7 @@ function App() {
       {/* Background layers */}
       <div className="grid-pattern absolute inset-0" />
       <div className="noise-overlay" />
-      
+
       {/* Ambient glow effects */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-[300px] -top-[300px] h-[600px] w-[600px] rounded-full bg-amber-500/5 blur-[120px]" />
@@ -68,7 +76,7 @@ function App() {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <a
                 href="https://github.com/sandepten/vtl-formatter"
@@ -102,7 +110,7 @@ function App() {
                   <span>{inputLineCount} lines</span>
                 </div>
               </div>
-              
+
               <div className="flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
                 <textarea
                   className="h-full w-full resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-zinc-100 placeholder-zinc-500 focus:outline-none"
@@ -118,23 +126,15 @@ function App() {
             <div className="animate-fade-in delay-200 flex flex-shrink-0 items-center justify-center opacity-0 md:flex-col md:gap-4 md:py-8">
               <button
                 onClick={formatVTL}
-                disabled={!input.trim() || isFormatting}
+                disabled={!input.trim()}
+                title="Format (⌘/Ctrl+Enter)"
                 className="btn-shine group relative flex h-12 w-[140px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 px-4 font-display text-sm font-semibold text-black shadow-lg shadow-amber-500/30 transition-all hover:from-amber-500 hover:to-amber-600 hover:shadow-xl hover:shadow-amber-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none md:h-14 md:w-[160px]"
               >
-                {isFormatting ? (
-                  <>
-                    <Sparkles className="h-4 w-4 animate-spin" />
-                    <span>Formatting</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-4 w-4 transition-transform group-hover:scale-110" />
-                    <span>Format</span>
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </>
-                )}
+                <Zap className="h-4 w-4 transition-transform group-hover:scale-110" />
+                <span>Format</span>
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </button>
-              
+
               {/* Decorative line */}
               <div className="hidden h-24 w-px bg-gradient-to-b from-transparent via-zinc-600 to-transparent md:block" />
             </div>
@@ -153,7 +153,9 @@ function App() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-zinc-400">{output ? `${outputLineCount} lines` : ""}</span>
+                  <span className="text-xs text-zinc-400">
+                    {output ? `${outputLineCount} lines` : ""}
+                  </span>
                   <button
                     onClick={handleCopy}
                     disabled={!output}
@@ -177,7 +179,7 @@ function App() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
                 <textarea
                   className="h-full w-full resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-zinc-100 placeholder-zinc-500 focus:outline-none"
