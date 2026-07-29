@@ -629,4 +629,11 @@ export function extractCondition(
 export const BLOCK_DIRECTIVES = ["if", "foreach", "macro", "define"];
 
 // List of simple directives that don't need special handling
-export const SIMPLE_DIRECTIVES = ["parse", "include", "stop", "break", "evaluate"];
+export const SIMPLE_DIRECTIVES = [
+  "parse",
+  "include",
+  "stop",
+  "break",
+  "evaluate",
+  "return",
+];

@@ -1,5 +1,4 @@
 import {
-  SIMPLE_DIRECTIVES,
   adjustForEachCondition,
   extractCondition,
   isComplexVariableReference,
@@ -351,30 +350,29 @@ export function formatVtlTemplate(input: string): string {
           processingSet = true;
           inlineMode = true;
           setParenCount = 0;
-        } else if (SIMPLE_DIRECTIVES.includes(directiveName)) {
+        } else {
+          // parse/include/evaluate/break/stop/return + custom macro calls
           appendOnOwnLine(token.value);
 
-          if (directiveName !== "stop" && directiveName !== "break") {
-            let nextIdx = i + 1;
-            while (
-              nextIdx < tokens.length &&
-              tokens[nextIdx]?.type === "whitespace"
-            ) {
-              nextIdx++;
-            }
-            if (
-              tokens[nextIdx]?.type === "punctuation" &&
-              tokens[nextIdx]?.value === "("
-            ) {
-              inDirectiveHeader = true;
-              directiveParenCount = 0;
-            }
+          let nextIdx = i + 1;
+          while (
+            nextIdx < tokens.length &&
+            (tokens[nextIdx]?.type === "whitespace" ||
+              tokens[nextIdx]?.type === "newline")
+          ) {
+            nextIdx++;
+          }
+          if (
+            tokens[nextIdx]?.type === "punctuation" &&
+            tokens[nextIdx]?.value === "("
+          ) {
+            inDirectiveHeader = true;
+            directiveParenCount = 0;
+            // Newlines/spaces between name and "(" are insignificant
+            pendingNewlines = 0;
           } else {
             needsNewline = true;
           }
-        } else {
-          appendOnOwnLine(token.value);
-          needsNewline = true;
         }
         lastTokenNeedsSpace = false;
         break;
