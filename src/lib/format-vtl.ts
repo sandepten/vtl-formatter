@@ -170,6 +170,7 @@ export function formatVtlTemplate(input: string): string {
     }
 
     if (
+      !processingSet &&
       lastTokenWasVariable &&
       token.type === "string" &&
       token.value.startsWith('"')
@@ -404,13 +405,22 @@ export function formatVtlTemplate(input: string): string {
 
       case "punctuation":
         if (token.value === "{" && !inJsonValueVar) {
-          appendOnOwnLine(token.value);
-          indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
-          needsNewline = true;
+          if (processingSet) {
+            // Keep #set map/object values compact; don't apply JSON block indent
+            formattedVTL += token.value;
+          } else {
+            appendOnOwnLine(token.value);
+            indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
+            needsNewline = true;
+          }
         } else if (token.value === "}" && !inJsonValueVar) {
-          indentStack.pop();
-          appendOnOwnLine(token.value);
-          needsNewline = true;
+          if (processingSet) {
+            formattedVTL += token.value;
+          } else {
+            indentStack.pop();
+            appendOnOwnLine(token.value);
+            needsNewline = true;
+          }
         } else if (token.value === "[" && !inJsonValueVar && !processingSet) {
           formattedVTL += token.value;
         } else if (
@@ -439,6 +449,11 @@ export function formatVtlTemplate(input: string): string {
             formattedVTL += token.value;
           }
         } else if (token.value === "," && !inJsonValueVar) {
+          if (processingSet) {
+            formattedVTL += ", ";
+            lastTokenNeedsSpace = false;
+            continue;
+          }
           formattedVTL += token.value;
           needsNewline = true;
         } else if (token.value === ":") {
@@ -490,6 +505,7 @@ export function formatVtlTemplate(input: string): string {
         }
         formattedVTL += token.value;
         formattedVTL += " ";
+        lastTokenWasVariable = false;
         lastTokenNeedsSpace = false;
         break;
 
