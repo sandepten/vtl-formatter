@@ -209,6 +209,12 @@ export function formatVtlTemplate(input: string): string {
     }
 
     if (inMacroHeader) {
+      if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+        const lastChar = formattedVTL[formattedVTL.length - 1];
+        if (lastChar && !/[\s(]/.test(lastChar)) {
+          formattedVTL += " ";
+        }
+      }
       formattedVTL += token.value;
       if (token.type === "punctuation") {
         if (token.value === "(") {
@@ -226,6 +232,12 @@ export function formatVtlTemplate(input: string): string {
     }
 
     if (inDirectiveHeader) {
+      if (lastTokenNeedsSpace && formattedVTL.length > 0) {
+        const lastChar = formattedVTL[formattedVTL.length - 1];
+        if (lastChar && !/[\s(,]/.test(lastChar)) {
+          formattedVTL += " ";
+        }
+      }
       formattedVTL += token.value;
       if (token.type === "punctuation") {
         if (token.value === "(") {
