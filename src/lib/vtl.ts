@@ -445,6 +445,12 @@ export function tokenize(vtl: string): Token[] {
 
       if (newlineCount > 0) {
         tokens.push({ type: "newline", value: "\n".repeat(newlineCount) });
+        // Keep indentation spaces that follow the last newline
+        const lastNl = value.lastIndexOf("\n");
+        const trailingIndent = value.slice(lastNl + 1);
+        if (trailingIndent.length > 0) {
+          tokens.push({ type: "whitespace", value: trailingIndent });
+        }
       } else {
         // Preserve a single space for non-newline whitespace
         tokens.push({ type: "whitespace", value: " " });

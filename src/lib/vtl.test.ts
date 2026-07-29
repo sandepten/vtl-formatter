@@ -33,6 +33,20 @@ describe("tokenize", () => {
     ]);
   });
 
+  it("preserves indentation spaces after newlines", () => {
+    const tokens = tokenize("<ul>\n  <li>a</li>\n</ul>");
+    expect(tokens).toEqual([
+      { type: "markup", value: "<ul>" },
+      { type: "newline", value: "\n" },
+      { type: "whitespace", value: "  " },
+      { type: "markup", value: "<li>" },
+      { type: "identifier", value: "a" },
+      { type: "markup", value: "</li>" },
+      { type: "newline", value: "\n" },
+      { type: "markup", value: "</ul>" },
+    ]);
+  });
+
   it("tokenizes #@ body macros as directives", () => {
     const tokens = tokenize("#@foo($x)");
     expect(tokens[0]).toEqual({ type: "directive", value: "#@foo" });

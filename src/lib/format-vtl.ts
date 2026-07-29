@@ -29,6 +29,8 @@ export function formatVtlTemplate(input: string): string {
 
   let lastTokenNeedsSpace = false;
   let pendingNewlines = 0;
+  /** Source indentation after a newline (e.g. HTML indent); used when not inside a VTL block. */
+  let pendingSourceIndent = "";
 
   const currentIndent = () => " ".repeat(indentStack[indentStack.length - 1]!);
 
@@ -46,6 +48,7 @@ export function formatVtlTemplate(input: string): string {
     if (formattedVTL.length === 0) {
       pendingNewlines = 0;
       needsNewline = false;
+      pendingSourceIndent = "";
       return "";
     }
 
@@ -73,8 +76,15 @@ export function formatVtlTemplate(input: string): string {
     pendingNewlines = 0;
     needsNewline = false;
 
+    // Inside VTL blocks use structural indent; at root preserve source HTML/text indent
+    const indent =
+      indentStack.length > 1
+        ? currentIndent()
+        : pendingSourceIndent || currentIndent();
+    pendingSourceIndent = "";
+
     const toAdd = Math.max(0, totalNewlines - trailing);
-    return "\n".repeat(toAdd) + currentIndent();
+    return "\n".repeat(toAdd) + indent;
   };
 
   const appendOnOwnLine = (value: string) => {
@@ -89,11 +99,17 @@ export function formatVtlTemplate(input: string): string {
       const count = token.value.length;
       pendingNewlines = Math.max(pendingNewlines, count);
       needsNewline = true;
+      pendingSourceIndent = "";
       continue;
     }
 
     if (token.type === "whitespace") {
-      lastTokenNeedsSpace = true;
+      if (needsNewline || pendingNewlines > 0 || formattedVTL.endsWith("\n")) {
+        // Line-leading indent from source (HTML/text); keep exact spaces/tabs
+        pendingSourceIndent = token.value;
+      } else {
+        lastTokenNeedsSpace = true;
+      }
       continue;
     }
 
@@ -120,6 +136,10 @@ export function formatVtlTemplate(input: string): string {
       token.value === ":" &&
       i + 1 < tokens.length
     ) {
+      // JSON value binding is `"key": $var` — not ternary `$a ? $b : $c`
+      const lastChar = formattedVTL[formattedVTL.length - 1];
+      const afterJsonKey = lastChar === '"' || lastChar === "'";
+
       let nextIdx = i + 1;
       while (
         nextIdx < tokens.length &&
@@ -128,8 +148,9 @@ export function formatVtlTemplate(input: string): string {
         nextIdx++;
       }
       if (
-        tokens[nextIdx]?.type === "variable" ||
-        isComplexVariableReference(tokens, nextIdx)
+        afterJsonKey &&
+        (tokens[nextIdx]?.type === "variable" ||
+          isComplexVariableReference(tokens, nextIdx))
       ) {
         formattedVTL += token.value + " ";
         inJsonValueVar = true;
@@ -210,6 +231,11 @@ export function formatVtlTemplate(input: string): string {
     }
 
     if (inMacroHeader) {
+      if (token.value === ",") {
+        formattedVTL += ", ";
+        lastTokenNeedsSpace = false;
+        continue;
+      }
       if (
         lastTokenNeedsSpace &&
         formattedVTL.length > 0 &&
@@ -237,6 +263,11 @@ export function formatVtlTemplate(input: string): string {
     }
 
     if (inDirectiveHeader) {
+      if (token.value === ",") {
+        formattedVTL += ", ";
+        lastTokenNeedsSpace = false;
+        continue;
+      }
       if (
         lastTokenNeedsSpace &&
         formattedVTL.length > 0 &&
@@ -505,7 +536,12 @@ export function formatVtlTemplate(input: string): string {
           formattedVTL += token.value;
           needsNewline = true;
         } else if (token.value === ":") {
-          formattedVTL += token.value + " ";
+          const lastChar = formattedVTL[formattedVTL.length - 1];
+          // JSON keys end with a quote — no leading space. Ternary/other uses need one.
+          if (lastChar && lastChar !== '"' && lastChar !== "'" && !/\s/.test(lastChar)) {
+            formattedVTL += " ";
+          }
+          formattedVTL += ": ";
         } else {
           formattedVTL += token.value;
         }

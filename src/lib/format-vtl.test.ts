@@ -183,4 +183,20 @@ c
       expect(formatVtlTemplate(once)).toBe(once);
     }
   });
+
+  it("preserves pure HTML indentation", () => {
+    expect(formatVtlTemplate(`<ul>\n  <li>a</li>\n</ul>`)).toBe(
+      `<ul>\n  <li>a</li>\n</ul>`,
+    );
+  });
+
+  it("keeps space before ternary colon in #set", () => {
+    expect(formatVtlTemplate("#set($x = $a ? $b : $c)")).toBe(
+      "#set($x = $a ? $b : $c)",
+    );
+  });
+
+  it("formats directive argument commas as ', '", () => {
+    expect(formatVtlTemplate('#say( "a" , "b" )')).toBe('#say("a", "b")');
+  });
 });
