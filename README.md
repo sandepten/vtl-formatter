@@ -7,13 +7,14 @@ A web-based formatter for Apache Velocity Template Language (VTL) code.
 ## Features
 
 - Format and beautify VTL code with proper indentation
-- Support for all VTL directives (`#if`, `#foreach`, `#set`, `#macro`, `#parse`, `#include`, etc.)
+- Support for common VTL directives (`#if`, `#foreach`, `#set`, `#macro`, `#parse`, `#include`, `#break`, `#return`, etc.)
 - Handles variables, method calls, and complex expressions
 - Multi-line and single-line comment support
-- Silent references (`$!variable`)
+- Silent references (`$!variable`) and body macros (`#@name`)
 - Range operators and alternate value syntax
 - Preserves HTML/XML tags in mixed VTL templates
 - Hybrid mixed-content formatting: keeps non-VTL structure stable while formatting VTL boundaries
+- Preserves blank lines in email/plain-text templates
 - All processing done locally in your browser
 
 ## Tech Stack

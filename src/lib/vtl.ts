@@ -143,15 +143,22 @@ export function tokenize(vtl: string): Token[] {
     if (char === "#") {
       let value = "#";
       current++;
+
+      // Body-content macro call: #@name
+      if (current < vtl.length && vtl[current] === "@") {
+        value += "@";
+        current++;
+      }
+
       while (current < vtl.length && /[a-zA-Z]/.test(vtl[current]!)) {
         value += vtl[current];
         current++;
       }
-      // Only push as directive if we captured something after #
-      if (value.length > 1) {
+      // Only push as directive if we captured something after # (and optional @)
+      if (value.length > 1 && value !== "#@") {
         tokens.push({ type: "directive", value });
       } else {
-        // Lone # is treated as text
+        // Lone # or #@ is treated as text/raw
         tokens.push({ type: "text", value });
       }
       continue;

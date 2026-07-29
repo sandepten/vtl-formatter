@@ -288,6 +288,36 @@ export function formatVtlTemplate(input: string): string {
       continue;
     }
 
+    // Body macros (#@name) are block directives that take args then content until #end
+    if (
+      token.type === "directive" &&
+      token.value.startsWith("#@")
+    ) {
+      appendOnOwnLine(token.value);
+      indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
+
+      let nextIdx = i + 1;
+      while (
+        nextIdx < tokens.length &&
+        (tokens[nextIdx]?.type === "whitespace" ||
+          tokens[nextIdx]?.type === "newline")
+      ) {
+        nextIdx++;
+      }
+      if (
+        tokens[nextIdx]?.type === "punctuation" &&
+        tokens[nextIdx]?.value === "("
+      ) {
+        inDirectiveHeader = true;
+        directiveParenCount = 0;
+        pendingNewlines = 0;
+      } else {
+        needsNewline = true;
+      }
+      lastTokenNeedsSpace = false;
+      continue;
+    }
+
     const directiveValue = token.value.trim();
     const directiveName = directiveValue.replace(/^#/, "").toLowerCase();
 
@@ -335,11 +365,15 @@ export function formatVtlTemplate(input: string): string {
     switch (token.type) {
       case "directive":
         if (directiveValue === "#end") {
-          indentStack.pop();
+          if (indentStack.length > 1) {
+            indentStack.pop();
+          }
           appendOnOwnLine(token.value);
           needsNewline = true;
         } else if (directiveName === "elseif") {
-          indentStack.pop();
+          if (indentStack.length > 1) {
+            indentStack.pop();
+          }
           const conditionResult = extractCondition(tokens, i + 1);
           let condition = conditionResult.condition;
           condition = normalizeLogicalOperators(condition);
@@ -348,7 +382,9 @@ export function formatVtlTemplate(input: string): string {
           indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
           needsNewline = true;
         } else if (directiveName === "else") {
-          indentStack.pop();
+          if (indentStack.length > 1) {
+            indentStack.pop();
+          }
           appendOnOwnLine("#else");
           indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
           needsNewline = true;
@@ -421,7 +457,9 @@ export function formatVtlTemplate(input: string): string {
           if (processingSet) {
             formattedVTL += token.value;
           } else {
-            indentStack.pop();
+            if (indentStack.length > 1) {
+              indentStack.pop();
+            }
             appendOnOwnLine(token.value);
             needsNewline = true;
           }
@@ -434,7 +472,9 @@ export function formatVtlTemplate(input: string): string {
           !inJsonValueVar &&
           !processingSet
         ) {
-          indentStack.pop();
+          if (indentStack.length > 1) {
+            indentStack.pop();
+          }
           appendOnOwnLine(token.value);
           needsNewline = true;
         } else if (token.value === "(" || token.value === ")") {
