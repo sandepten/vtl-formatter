@@ -23,4 +23,26 @@ describe("tokenize", () => {
     const tokens = tokenize("@@@");
     expect(tokens).toEqual([{ type: "raw_text", value: "@@@" }]);
   });
+
+  it("preserves consecutive newline counts for blank lines", () => {
+    const tokens = tokenize("a\n\nb");
+    expect(tokens).toEqual([
+      { type: "identifier", value: "a" },
+      { type: "newline", value: "\n\n" },
+      { type: "identifier", value: "b" },
+    ]);
+  });
+
+  it("tokenizes #@ body macros as directives", () => {
+    const tokens = tokenize("#@foo($x)");
+    expect(tokens[0]).toEqual({ type: "directive", value: "#@foo" });
+  });
+
+  it("tokenizes formal directives", () => {
+    const tokens = tokenize("#{if}($x)#{end}");
+    expect(tokens.filter((t) => t.type === "directive")).toEqual([
+      { type: "directive", value: "#if" },
+      { type: "directive", value: "#end" },
+    ]);
+  });
 });
