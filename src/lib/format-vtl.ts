@@ -306,7 +306,11 @@ export function formatVtlTemplate(input: string): string {
     const selfPrefixes =
       token.type === "directive" ||
       (token.type === "punctuation" &&
-        (token.value === "{" || token.value === "}"));
+        (token.value === "{" ||
+          token.value === "}" ||
+          token.value === "[" ||
+          token.value === "]" ||
+          token.value === ","));
 
     if (
       !selfPrefixes &&
@@ -423,12 +427,16 @@ export function formatVtlTemplate(input: string): string {
           }
         } else if (token.value === "[" && !inJsonValueVar && !processingSet) {
           formattedVTL += token.value;
+          indentStack.push(indentStack[indentStack.length - 1]! + indentSize);
+          needsNewline = true;
         } else if (
           token.value === "]" &&
           !inJsonValueVar &&
           !processingSet
         ) {
-          formattedVTL += token.value;
+          indentStack.pop();
+          appendOnOwnLine(token.value);
+          needsNewline = true;
         } else if (token.value === "(" || token.value === ")") {
           if (processingSet) {
             if (token.value === "(") {
